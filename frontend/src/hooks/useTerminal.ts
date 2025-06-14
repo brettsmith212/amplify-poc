@@ -42,6 +42,7 @@ export const useTerminal = (
   const resizeObserverRef = useRef<ResizeObserver>();
   const resizeTimeoutRef = useRef<number>();
   const keyboardHandlerRef = useRef<((event: KeyboardEvent) => void) | null>(null);
+  const isFittingRef = useRef(false);
   
   // Use refs for callbacks to prevent recreation
   const onDataRef = useRef(onData);
@@ -110,13 +111,23 @@ export const useTerminal = (
     });
 
     // Handle resize
+    let lastResizeDimensions = { cols: 0, rows: 0 };
     terminal.onResize(({ cols, rows }) => {
-      const dimensions = { cols, rows };
-      setState(prev => ({
-        ...prev,
-        dimensions
-      }));
-      onResizeRef.current?.(dimensions);
+      // Skip ALL updates if this resize was triggered by our own fit() call
+      if (isFittingRef.current) {
+        return;
+      }
+      
+      // Only update if dimensions actually changed
+      if (cols !== lastResizeDimensions.cols || rows !== lastResizeDimensions.rows) {
+        lastResizeDimensions = { cols, rows };
+        const dimensions = { cols, rows };
+        setState(prev => ({
+          ...prev,
+          dimensions
+        }));
+        onResizeRef.current?.(dimensions);
+      }
     });
 
     // Open terminal in container
@@ -141,20 +152,11 @@ export const useTerminal = (
 
   const fit = useCallback(() => {
     if (fitAddonRef.current && state.terminal) {
+      isFittingRef.current = true;
       fitAddonRef.current.fit();
+      isFittingRef.current = false;
       
-      // Update dimensions after fit
-      const dimensions = {
-        cols: state.terminal.cols,
-        rows: state.terminal.rows
-      };
-      
-      setState(prev => ({
-        ...prev,
-        dimensions
-      }));
-      
-      onResizeRef.current?.(dimensions);
+      // terminal.onResize will handle the state update automatically
     }
   }, [state.terminal]);
 
@@ -250,20 +252,9 @@ export const useTerminal = (
           
           resizeTimeoutRef.current = window.setTimeout(() => {
             if (fitAddonRef.current && terminal) {
+              isFittingRef.current = true;
               fitAddonRef.current.fit();
-              
-              // Update dimensions and call resize callback
-              const dimensions = {
-                cols: terminal.cols,
-                rows: terminal.rows
-              };
-              
-              setState(prev => ({
-                ...prev,
-                dimensions
-              }));
-              
-              onResizeRef.current?.(dimensions);
+              isFittingRef.current = false;
             }
           }, resizeDebounceMs);
         });

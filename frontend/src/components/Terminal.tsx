@@ -104,8 +104,8 @@ const Terminal: React.FC<TerminalProps> = ({
     onData: handleData,
     onResize: handleResize,
     onControlKey: handleControlKey,
-    enableResizeObserver: true,
-    resizeDebounceMs: 150,
+    enableResizeObserver: false,
+    resizeDebounceMs: 500,
     enableKeyboardShortcuts: true
   });
 
