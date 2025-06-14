@@ -1,7 +1,9 @@
 # Implementation Plan
 
 ## Project Foundation
-- [ ] Step 1: Initialize Node.js Project Structure
+
+- [x] Step 1: Initialize Node.js Project Structure
+
   - **Task**: Create a Node.js project with TypeScript, set up package.json with backend dependencies (commander, ws, express, dockerode) and initialize Vite React frontend with TypeScript and TailwindCSS.
   - **Description**: Establishes the foundation for the Amplify CLI tool with separate backend and frontend folders, backend CLI dependencies, and modern React frontend with TypeScript and TailwindCSS.
   - **Files**:
@@ -18,7 +20,7 @@
   - **Step Dependencies**: None
   - **User Instructions**: Run `cd backend && npm install && cd ../frontend && npm install` to install dependencies
 
-- [ ] Step 2: Create Docker Base Image
+- [x] Step 2: Create Docker Base Image
   - **Task**: Implement the Dockerfile.base as specified in the PRD, with Ubuntu 24.04, Node.js, npm, and AMP CLI installation.
   - **Description**: Creates the foundational Docker image that will be reused across all sessions, containing the amp CLI and necessary tools.
   - **Files**:
@@ -28,7 +30,9 @@
   - **User Instructions**: Run `./scripts/build-base-image.sh` to build the base image
 
 ## Core CLI Implementation
+
 - [ ] Step 3: Implement Docker Image Management
+
   - **Task**: Create functionality to check if amplify-base image exists, build it if missing, and handle Docker operations using dockerode library.
   - **Description**: Handles the Docker image lifecycle management as specified in the PRD, ensuring the base image is available before running containers.
   - **Files**:
@@ -49,7 +53,9 @@
   - **User Instructions**: Ensure AMP_API_KEY environment variable is set for testing
 
 ## Web Server and Terminal Interface
+
 - [ ] Step 5: Create Web Server with Vite Integration
+
   - **Task**: Implement Express server to serve Vite-built React app on localhost:3000 with WebSocket upgrade capability, including dev mode proxy for hot reload.
   - **Description**: Provides the web interface foundation that will host the React terminal UI and handle WebSocket connections, with development mode supporting Vite's hot reload.
   - **Files**:
@@ -75,7 +81,9 @@
   - **User Instructions**: Open browser and verify React terminal component renders correctly
 
 ## WebSocket Bridge Implementation
+
 - [ ] Step 7: Implement WebSocket to Docker Exec Bridge
+
   - **Task**: Create WebSocket server that bridges browser terminal input/output with docker exec commands inside the container.
   - **Description**: Core functionality that connects the browser terminal to the Docker container, enabling real-time command execution and output streaming.
   - **Files**:
@@ -97,7 +105,9 @@
   - **User Instructions**: Test terminal resizing and Ctrl-C interrupt functionality
 
 ## CLI Integration and Polish
+
 - [ ] Step 9: Implement Main CLI Command Interface
+
   - **Task**: Create the main CLI entry point that orchestrates image building, container running, web server starting, and browser launching.
   - **Description**: Ties together all components into a cohesive CLI tool that matches the PRD's user experience requirements.
   - **Files**:
@@ -118,14 +128,16 @@
   - **User Instructions**: Test various failure scenarios and exit methods
 
 ## Testing and Documentation
+
 - [ ] Step 11: Implement Unit Tests
+
   - **Task**: Create comprehensive unit tests for backend (Docker, WebSocket, CLI) using Jest and frontend (React components, hooks) using Vitest and React Testing Library.
   - **Description**: Ensures code reliability and maintainability with comprehensive test coverage for both backend and frontend functionality.
   - **Files**:
     - `backend/jest.config.js`: Jest configuration for backend TypeScript and Node.js testing
     - `frontend/vitest.config.ts`: Vitest configuration for frontend React component testing
     - `backend/src/__tests__/docker.test.ts`: Docker operation unit tests
-    - `backend/src/__tests__/websocket.test.ts`: WebSocket and terminal bridge tests  
+    - `backend/src/__tests__/websocket.test.ts`: WebSocket and terminal bridge tests
     - `backend/src/__tests__/cli.test.ts`: CLI command and integration tests
     - `frontend/src/components/__tests__/Terminal.test.tsx`: Terminal component tests
     - `frontend/src/hooks/__tests__/useWebSocket.test.ts`: WebSocket hook tests
@@ -149,13 +161,15 @@
 This implementation plan breaks down the Amplify POC into 12 manageable steps that can be executed sequentially. The approach follows the PRD's architecture closely:
 
 **Key Implementation Strategy:**
+
 1. **Modern Frontend Stack**: Vite + React + TypeScript + TailwindCSS for maintainable, scalable UI
-2. **Foundation First**: Establish project structure and Docker base image before building functionality  
+2. **Foundation First**: Establish project structure and Docker base image before building functionality
 3. **Layer by Layer**: Build from Docker management → Web server → React terminal → WebSocket bridge → CLI integration
 4. **Testing Throughout**: Include comprehensive testing for both backend (Jest) and frontend (Vitest) at each milestone
 5. **Progressive Enhancement**: Each step builds upon previous functionality while remaining atomic
 
 **Critical Considerations:**
+
 - Container lifecycle management with proper cleanup is essential for resource management
 - WebSocket bridge must handle both data streaming and control signals reliably
 - Error handling should provide clear, actionable feedback for common failure scenarios
@@ -165,6 +179,7 @@ This implementation plan breaks down the Amplify POC into 12 manageable steps th
 **Timeline Alignment**: This plan aligns with the 4-week timeline in the PRD, with foundational work in weeks 1-2, core functionality in week 3, and polish/testing in week 4.
 
 The plan ensures all Definition of Done criteria are met:
+
 1. `npx amplify` command functionality
 2. Sub-3-second browser launch
 3. Full amp CLI functionality in container
