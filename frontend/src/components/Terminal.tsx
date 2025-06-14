@@ -136,47 +136,59 @@ const Terminal: React.FC<TerminalProps> = ({
   }, [isConnected, terminalReady, dimensions, sendMessage]);
 
   return (
-    <div className={`terminal-container ${className}`}>
+    <div className={`terminal-container h-full flex flex-col ${className}`}>
       {/* Connection status indicator */}
-      <div className="flex items-center justify-between bg-gray-800 px-4 py-2 text-sm">
+      <div className="flex items-center justify-between bg-gray-800/50 px-4 py-2 text-sm border-b border-gray-700/30">
         <div className="flex items-center space-x-2">
           <div className={`w-2 h-2 rounded-full ${
-            isConnected ? 'bg-green-500' : 'bg-red-500'
+            isConnected ? 'bg-green-400 animate-pulse' : 'bg-red-500'
           }`} />
-          <span className="text-gray-300">
+          <span className="text-gray-300 font-medium">
             {isConnected ? 'Connected' : 'Disconnected'}
           </span>
         </div>
-        <div className="text-gray-400 text-xs">
+        <div className="text-gray-400 text-xs font-mono bg-gray-700/30 px-2 py-1 rounded">
           {dimensions.cols}×{dimensions.rows}
         </div>
       </div>
 
       {/* Error display */}
       {error && (
-        <div className="bg-red-900/50 border border-red-500 px-4 py-2 text-red-200 text-sm">
-          <span className="font-semibold">Connection Error:</span> {error}
+        <div className="bg-red-900/50 border-l-4 border-red-500 px-4 py-3 text-red-200 text-sm">
+          <div className="flex items-center space-x-2">
+            <svg className="w-4 h-4 text-red-400" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd"></path>
+            </svg>
+            <span className="font-semibold">Connection Error:</span>
+            <span>{error}</span>
+          </div>
         </div>
       )}
 
       {/* Terminal container */}
-      <div 
-        ref={terminalRef}
-        className={`terminal-element bg-gray-900 flex-1 ${
-          !terminalReady ? 'opacity-50' : ''
-        }`}
-        style={{ minHeight: '400px' }}
-      />
+      <div className="flex-1 relative overflow-hidden">
+        <div 
+          ref={terminalRef}
+          className={`terminal-element h-full w-full bg-gray-900 ${
+            !terminalReady ? 'opacity-50' : ''
+          }`}
+          style={{ 
+            fontFamily: 'Monaco, "Cascadia Code", "SF Mono", Consolas, "Liberation Mono", Menlo, monospace',
+            fontSize: '14px',
+            lineHeight: '1.2'
+          }}
+        />
 
-      {/* Loading overlay */}
-      {!terminalReady && (
-        <div className="absolute inset-0 flex items-center justify-center bg-gray-900/75">
-          <div className="flex items-center space-x-2 text-gray-300">
-            <div className="animate-spin w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full" />
-            <span>Initializing terminal...</span>
+        {/* Loading overlay */}
+        {!terminalReady && (
+          <div className="absolute inset-0 flex items-center justify-center bg-gray-900/80 backdrop-blur-sm">
+            <div className="flex items-center space-x-3 text-gray-300 bg-gray-800/80 px-4 py-3 rounded-lg border border-gray-700/50">
+              <div className="animate-spin w-5 h-5 border-2 border-blue-400 border-t-transparent rounded-full" />
+              <span className="text-sm font-medium">Initializing terminal...</span>
+            </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 };

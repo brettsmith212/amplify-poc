@@ -19,21 +19,31 @@
 
 body {
   margin: 0;
-  display: flex;
-  place-items: center;
   min-width: 320px;
   min-height: 100vh;
 }
 
 #root {
   width: 100%;
+  height: 100vh;
   margin: 0 auto;
-  text-align: center;
 }
 
 /* Terminal-specific styles */
 .terminal-container {
   font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  text-align: left !important;
+}
+
+.terminal-element {
+  text-align: left !important;
+}
+
+/* Ensure xterm terminal content is left-aligned */
+.terminal-element .xterm,
+.terminal-element .xterm-viewport,
+.terminal-element .xterm-screen {
+  text-align: left !important;
 }
 
 /* Scrollbar styling for terminal */
@@ -42,14 +52,19 @@ body {
 }
 
 .terminal-container ::-webkit-scrollbar-track {
-  background: #1a1a1a;
+  background: #1a1b26;
 }
 
 .terminal-container ::-webkit-scrollbar-thumb {
-  background: #4a4a4a;
+  background: #414868;
   border-radius: 4px;
 }
 
 .terminal-container ::-webkit-scrollbar-thumb:hover {
-  background: #6a6a6a;
+  background: #565f89;
+}
+
+/* Ensure no text centering in terminal */
+.terminal-container * {
+  text-align: left !important;
 }
