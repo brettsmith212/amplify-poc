@@ -7,18 +7,30 @@ import { TerminalHookState, ResizeData } from '../types/terminal';
 interface UseTerminalOptions {
   onData?: (data: string) => void;
   onResize?: (data: ResizeData) => void;
+  onControlKey?: (key: string, event: KeyboardEvent) => void;
   theme?: {
     background?: string;
     foreground?: string;
     cursor?: string;
   };
+  enableResizeObserver?: boolean;
+  resizeDebounceMs?: number;
+  enableKeyboardShortcuts?: boolean;
 }
 
 export const useTerminal = (
   containerRef: React.RefObject<HTMLElement>,
   options: UseTerminalOptions = {}
 ) => {
-  const { onData, onResize, theme } = options;
+  const { 
+    onData, 
+    onResize, 
+    onControlKey,
+    theme,
+    enableResizeObserver = true,
+    resizeDebounceMs = 100,
+    enableKeyboardShortcuts = true
+  } = options;
 
   const [state, setState] = useState<TerminalHookState>({
     terminal: null,
@@ -28,6 +40,8 @@ export const useTerminal = (
 
   const fitAddonRef = useRef<FitAddon>();
   const resizeObserverRef = useRef<ResizeObserver>();
+  const resizeTimeoutRef = useRef<number>();
+  const keyboardHandlerRef = useRef<((event: KeyboardEvent) => void) | null>(null);
 
   const initializeTerminal = useCallback(() => {
     if (!containerRef.current) return;
@@ -107,8 +121,31 @@ export const useTerminal = (
   const fit = useCallback(() => {
     if (fitAddonRef.current && state.terminal) {
       fitAddonRef.current.fit();
+      
+      // Update dimensions after fit
+      const dimensions = {
+        cols: state.terminal.cols,
+        rows: state.terminal.rows
+      };
+      
+      setState(prev => ({
+        ...prev,
+        dimensions
+      }));
+      
+      onResize?.(dimensions);
     }
-  }, [state.terminal]);
+  }, [state.terminal, onResize]);
+
+  const debouncedFit = useCallback(() => {
+    if (resizeTimeoutRef.current) {
+      window.clearTimeout(resizeTimeoutRef.current);
+    }
+    
+    resizeTimeoutRef.current = window.setTimeout(() => {
+      fit();
+    }, resizeDebounceMs);
+  }, [fit, resizeDebounceMs]);
 
   const write = useCallback((data: string) => {
     if (state.terminal && state.isReady) {
@@ -134,34 +171,98 @@ export const useTerminal = (
     }
   }, [state.terminal, state.isReady]);
 
+  const setupKeyboardHandler = useCallback(() => {
+    if (!enableKeyboardShortcuts) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      // Handle common terminal control keys
+      if (event.ctrlKey) {
+        switch (event.key.toLowerCase()) {
+          case 'c':
+            onControlKey?.('SIGINT', event);
+            break;
+          case 'z':
+            onControlKey?.('SIGTSTP', event);
+            break;
+          case '\\':
+            onControlKey?.('SIGQUIT', event);
+            break;
+          case 'd':
+            // Ctrl-D (EOF)
+            onControlKey?.('EOF', event);
+            break;
+          case 'l':
+            // Ctrl-L (clear screen) - let terminal handle this naturally
+            break;
+        }
+      } else if (event.altKey) {
+        switch (event.key.toLowerCase()) {
+          case 'f4':
+            // Alt-F4 equivalent
+            onControlKey?.('SIGTERM', event);
+            break;
+        }
+      }
+    };
+
+    keyboardHandlerRef.current = handleKeyDown;
+    document.addEventListener('keydown', handleKeyDown);
+  }, [enableKeyboardShortcuts, onControlKey]);
+
+  const cleanupKeyboardHandler = useCallback(() => {
+    if (keyboardHandlerRef.current) {
+      document.removeEventListener('keydown', keyboardHandlerRef.current);
+      keyboardHandlerRef.current = null;
+    }
+  }, []);
+
   useEffect(() => {
     const terminal = initializeTerminal();
 
     if (terminal && containerRef.current) {
-      // Set up resize observer
-      resizeObserverRef.current = new ResizeObserver(() => {
-        setTimeout(() => fit(), 0);
-      });
-      
-      resizeObserverRef.current.observe(containerRef.current);
+      // Set up resize observer with debouncing
+      if (enableResizeObserver) {
+        resizeObserverRef.current = new ResizeObserver(() => {
+          debouncedFit();
+        });
+        
+        resizeObserverRef.current.observe(containerRef.current);
+      }
+
+      // Set up keyboard handler
+      setupKeyboardHandler();
     }
 
     return () => {
+      // Clear resize timeout
+      if (resizeTimeoutRef.current) {
+        window.clearTimeout(resizeTimeoutRef.current);
+      }
+      
+      // Disconnect resize observer
       if (resizeObserverRef.current) {
         resizeObserverRef.current.disconnect();
       }
+      
+      // Clean up keyboard handler
+      cleanupKeyboardHandler();
+      
+      // Dispose terminal
       if (terminal) {
         terminal.dispose();
       }
     };
-  }, [containerRef, initializeTerminal, fit]);
+  }, [containerRef, initializeTerminal, debouncedFit, enableResizeObserver, setupKeyboardHandler, cleanupKeyboardHandler]);
 
   return {
     ...state,
     fit,
+    debouncedFit,
     write,
     writeln,
     clear,
-    focus
+    focus,
+    setupKeyboardHandler,
+    cleanupKeyboardHandler
   };
 };

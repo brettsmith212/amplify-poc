@@ -85,7 +85,21 @@ const Terminal: React.FC<TerminalProps> = ({
         timestamp: Date.now()
       });
       onResize?.(resizeData);
-    }
+    },
+    onControlKey: (key, event) => {
+      // Handle control key combinations
+      if (['SIGINT', 'SIGTERM', 'SIGTSTP', 'SIGQUIT'].includes(key)) {
+        event.preventDefault();
+        sendMessageRef.current?.({
+          type: 'control',
+          data: { signal: key as any },
+          timestamp: Date.now()
+        });
+      }
+    },
+    enableResizeObserver: true,
+    resizeDebounceMs: 150,
+    enableKeyboardShortcuts: true
   });
 
   // Store terminal functions in refs for WebSocket callbacks
@@ -102,29 +116,17 @@ const Terminal: React.FC<TerminalProps> = ({
     }
   }, [terminalReady, terminal, focus, onReady]);
 
-  // Handle keyboard shortcuts
+  // Connection status effect
   useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      // Ctrl+C handling
-      if (event.ctrlKey && event.key === 'c') {
-        sendMessage({
-          type: 'control',
-          data: { signal: 'SIGINT' },
-          timestamp: Date.now()
-        });
-      }
-    };
-
-    if (terminalReady) {
-      document.addEventListener('keydown', handleKeyDown);
+    if (isConnected && terminalReady && writelnRef.current && dimensions) {
+      // Send initial resize to sync terminal dimensions
+      sendMessage({
+        type: 'resize',
+        data: dimensions,
+        timestamp: Date.now()
+      });
     }
-
-    return () => {
-      if (terminalReady) {
-        document.removeEventListener('keydown', handleKeyDown);
-      }
-    };
-  }, [terminalReady, sendMessage]);
+  }, [isConnected, terminalReady, dimensions, sendMessage]);
 
   return (
     <div className={`terminal-container ${className}`}>

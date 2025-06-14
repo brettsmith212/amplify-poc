@@ -93,7 +93,7 @@
   - **Step Dependencies**: Step 6
   - **User Instructions**: Test by typing commands in the browser terminal
 
-- [ ] Step 8: Implement Terminal Resize and Control Handling
+- [x] Step 8: Implement Terminal Resize and Control Handling
   - **Task**: Add support for terminal resize events, Ctrl-C handling, and proper terminal session management with React integration.
   - **Description**: Ensures the terminal behaves like a native terminal with proper resize, control character handling, and session management, integrated with React component lifecycle.
   - **Files**:
