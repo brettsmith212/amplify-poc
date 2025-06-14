@@ -185,7 +185,9 @@ export class TerminalBridge {
       // Set up exec session event handlers
       this.execManager.on('output', (execSessionId: string, data: Buffer) => {
         if (execSessionId === shellSessionId) {
-          this.sendMessage(session, session.messageHandler.createOutputMessage(data.toString()));
+          const output = data.toString();
+          logger.debug(`Shell output for ${execSessionId}:`, { output: JSON.stringify(output) });
+          this.sendMessage(session, session.messageHandler.createOutputMessage(output));
         }
       });
 
@@ -210,6 +212,11 @@ export class TerminalBridge {
 
       // Start the exec session
       await this.execManager.startExecSession(shellSessionId);
+      
+      // Send initial newline to trigger shell prompt
+      setTimeout(async () => {
+        await this.execManager.writeToSession(shellSessionId, '\r');
+      }, 100);
       
       // Update session manager with shell info
       this.sessionManager.updateShellInfo(session.id, shellSessionId, '/workspace');

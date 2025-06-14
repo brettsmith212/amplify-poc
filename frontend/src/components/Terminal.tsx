@@ -59,6 +59,39 @@ const Terminal: React.FC<TerminalProps> = ({
     sendMessageRef.current = sendMessage;
   }, [sendMessage]);
 
+  // Stable callback functions
+  const handleData = useCallback((data: string) => {
+    // Send terminal input to WebSocket
+    sendMessageRef.current?.({
+      type: 'input',
+      data,
+      timestamp: Date.now()
+    });
+    onData?.(data);
+  }, [onData]);
+
+  const handleResize = useCallback((resizeData: any) => {
+    // Send resize event to WebSocket
+    sendMessageRef.current?.({
+      type: 'resize',
+      data: resizeData,
+      timestamp: Date.now()
+    });
+    onResize?.(resizeData);
+  }, [onResize]);
+
+  const handleControlKey = useCallback((key: string, event: KeyboardEvent) => {
+    // Handle control key combinations
+    if (['SIGINT', 'SIGTERM', 'SIGTSTP', 'SIGQUIT'].includes(key)) {
+      event.preventDefault();
+      sendMessageRef.current?.({
+        type: 'control',
+        data: { signal: key as any },
+        timestamp: Date.now()
+      });
+    }
+  }, []);
+
   // Terminal hook for xterm.js management
   const {
     terminal,
@@ -68,35 +101,9 @@ const Terminal: React.FC<TerminalProps> = ({
     focus,
     dimensions
   } = useTerminal(terminalRef, {
-    onData: (data) => {
-      // Send terminal input to WebSocket
-      sendMessageRef.current?.({
-        type: 'input',
-        data,
-        timestamp: Date.now()
-      });
-      onData?.(data);
-    },
-    onResize: (resizeData) => {
-      // Send resize event to WebSocket
-      sendMessageRef.current?.({
-        type: 'resize',
-        data: resizeData,
-        timestamp: Date.now()
-      });
-      onResize?.(resizeData);
-    },
-    onControlKey: (key, event) => {
-      // Handle control key combinations
-      if (['SIGINT', 'SIGTERM', 'SIGTSTP', 'SIGQUIT'].includes(key)) {
-        event.preventDefault();
-        sendMessageRef.current?.({
-          type: 'control',
-          data: { signal: key as any },
-          timestamp: Date.now()
-        });
-      }
-    },
+    onData: handleData,
+    onResize: handleResize,
+    onControlKey: handleControlKey,
     enableResizeObserver: true,
     resizeDebounceMs: 150,
     enableKeyboardShortcuts: true

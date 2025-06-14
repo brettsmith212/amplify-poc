@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { WebLinksAddon } from '@xterm/addon-web-links';
@@ -42,6 +42,47 @@ export const useTerminal = (
   const resizeObserverRef = useRef<ResizeObserver>();
   const resizeTimeoutRef = useRef<number>();
   const keyboardHandlerRef = useRef<((event: KeyboardEvent) => void) | null>(null);
+  
+  // Use refs for callbacks to prevent recreation
+  const onDataRef = useRef(onData);
+  const onResizeRef = useRef(onResize);
+  const onControlKeyRef = useRef(onControlKey);
+  
+  // Update refs when callbacks change
+  useEffect(() => {
+    onDataRef.current = onData;
+  }, [onData]);
+  
+  useEffect(() => {
+    onResizeRef.current = onResize;
+  }, [onResize]);
+  
+  useEffect(() => {
+    onControlKeyRef.current = onControlKey;
+  }, [onControlKey]);
+
+  // Stable theme object
+  const terminalTheme = useMemo(() => ({
+    background: theme?.background || '#1a1b26',
+    foreground: theme?.foreground || '#c0caf5',
+    cursor: theme?.cursor || '#c0caf5',
+    black: '#15161e',
+    red: '#f7768e',
+    green: '#9ece6a',
+    yellow: '#e0af68',
+    blue: '#7aa2f7',
+    magenta: '#bb9af7',
+    cyan: '#7dcfff',
+    white: '#a9b1d6',
+    brightBlack: '#414868',
+    brightRed: '#f7768e',
+    brightGreen: '#9ece6a',
+    brightYellow: '#e0af68',
+    brightBlue: '#7aa2f7',
+    brightMagenta: '#bb9af7',
+    brightCyan: '#7dcfff',
+    brightWhite: '#c0caf5'
+  }), [theme]);
 
   const initializeTerminal = useCallback(() => {
     if (!containerRef.current) return;
@@ -51,27 +92,7 @@ export const useTerminal = (
       fontFamily: 'Monaco, "Cascadia Code", "SF Mono", Consolas, "Liberation Mono", Menlo, monospace',
       fontSize: 14,
       lineHeight: 1.2,
-      theme: {
-        background: theme?.background || '#1a1b26',
-        foreground: theme?.foreground || '#c0caf5',
-        cursor: theme?.cursor || '#c0caf5',
-        black: '#15161e',
-        red: '#f7768e',
-        green: '#9ece6a',
-        yellow: '#e0af68',
-        blue: '#7aa2f7',
-        magenta: '#bb9af7',
-        cyan: '#7dcfff',
-        white: '#a9b1d6',
-        brightBlack: '#414868',
-        brightRed: '#f7768e',
-        brightGreen: '#9ece6a',
-        brightYellow: '#e0af68',
-        brightBlue: '#7aa2f7',
-        brightMagenta: '#bb9af7',
-        brightCyan: '#7dcfff',
-        brightWhite: '#c0caf5'
-      }
+      theme: terminalTheme
     });
 
     // Add addons
@@ -85,7 +106,7 @@ export const useTerminal = (
 
     // Handle data input
     terminal.onData((data) => {
-      onData?.(data);
+      onDataRef.current?.(data);
     });
 
     // Handle resize
@@ -95,7 +116,7 @@ export const useTerminal = (
         ...prev,
         dimensions
       }));
-      onResize?.(dimensions);
+      onResizeRef.current?.(dimensions);
     });
 
     // Open terminal in container
@@ -116,7 +137,7 @@ export const useTerminal = (
     }, 0);
 
     return terminal;
-  }, [containerRef, onData, onResize, theme]);
+  }, [containerRef, terminalTheme]);
 
   const fit = useCallback(() => {
     if (fitAddonRef.current && state.terminal) {
@@ -133,9 +154,9 @@ export const useTerminal = (
         dimensions
       }));
       
-      onResize?.(dimensions);
+      onResizeRef.current?.(dimensions);
     }
-  }, [state.terminal, onResize]);
+  }, [state.terminal]);
 
   const debouncedFit = useCallback(() => {
     if (resizeTimeoutRef.current) {
@@ -179,17 +200,17 @@ export const useTerminal = (
       if (event.ctrlKey) {
         switch (event.key.toLowerCase()) {
           case 'c':
-            onControlKey?.('SIGINT', event);
+            onControlKeyRef.current?.('SIGINT', event);
             break;
           case 'z':
-            onControlKey?.('SIGTSTP', event);
+            onControlKeyRef.current?.('SIGTSTP', event);
             break;
           case '\\':
-            onControlKey?.('SIGQUIT', event);
+            onControlKeyRef.current?.('SIGQUIT', event);
             break;
           case 'd':
             // Ctrl-D (EOF)
-            onControlKey?.('EOF', event);
+            onControlKeyRef.current?.('EOF', event);
             break;
           case 'l':
             // Ctrl-L (clear screen) - let terminal handle this naturally
@@ -199,7 +220,7 @@ export const useTerminal = (
         switch (event.key.toLowerCase()) {
           case 'f4':
             // Alt-F4 equivalent
-            onControlKey?.('SIGTERM', event);
+            onControlKeyRef.current?.('SIGTERM', event);
             break;
         }
       }
@@ -207,7 +228,7 @@ export const useTerminal = (
 
     keyboardHandlerRef.current = handleKeyDown;
     document.addEventListener('keydown', handleKeyDown);
-  }, [enableKeyboardShortcuts, onControlKey]);
+  }, [enableKeyboardShortcuts]);
 
   const cleanupKeyboardHandler = useCallback(() => {
     if (keyboardHandlerRef.current) {
@@ -220,17 +241,72 @@ export const useTerminal = (
     const terminal = initializeTerminal();
 
     if (terminal && containerRef.current) {
-      // Set up resize observer with debouncing
+      // Set up resize observer with debouncing - use direct fit call to avoid dependency
       if (enableResizeObserver) {
         resizeObserverRef.current = new ResizeObserver(() => {
-          debouncedFit();
+          if (resizeTimeoutRef.current) {
+            window.clearTimeout(resizeTimeoutRef.current);
+          }
+          
+          resizeTimeoutRef.current = window.setTimeout(() => {
+            if (fitAddonRef.current && terminal) {
+              fitAddonRef.current.fit();
+              
+              // Update dimensions and call resize callback
+              const dimensions = {
+                cols: terminal.cols,
+                rows: terminal.rows
+              };
+              
+              setState(prev => ({
+                ...prev,
+                dimensions
+              }));
+              
+              onResizeRef.current?.(dimensions);
+            }
+          }, resizeDebounceMs);
         });
         
         resizeObserverRef.current.observe(containerRef.current);
       }
 
-      // Set up keyboard handler
-      setupKeyboardHandler();
+      // Set up keyboard handler - inline to avoid dependency
+      if (enableKeyboardShortcuts) {
+        const handleKeyDown = (event: KeyboardEvent) => {
+          // Handle common terminal control keys
+          if (event.ctrlKey) {
+            switch (event.key.toLowerCase()) {
+              case 'c':
+                onControlKeyRef.current?.('SIGINT', event);
+                break;
+              case 'z':
+                onControlKeyRef.current?.('SIGTSTP', event);
+                break;
+              case '\\':
+                onControlKeyRef.current?.('SIGQUIT', event);
+                break;
+              case 'd':
+                // Ctrl-D (EOF)
+                onControlKeyRef.current?.('EOF', event);
+                break;
+              case 'l':
+                // Ctrl-L (clear screen) - let terminal handle this naturally
+                break;
+            }
+          } else if (event.altKey) {
+            switch (event.key.toLowerCase()) {
+              case 'f4':
+                // Alt-F4 equivalent
+                onControlKeyRef.current?.('SIGTERM', event);
+                break;
+            }
+          }
+        };
+
+        keyboardHandlerRef.current = handleKeyDown;
+        document.addEventListener('keydown', handleKeyDown);
+      }
     }
 
     return () => {
@@ -245,14 +321,17 @@ export const useTerminal = (
       }
       
       // Clean up keyboard handler
-      cleanupKeyboardHandler();
+      if (keyboardHandlerRef.current) {
+        document.removeEventListener('keydown', keyboardHandlerRef.current);
+        keyboardHandlerRef.current = null;
+      }
       
       // Dispose terminal
       if (terminal) {
         terminal.dispose();
       }
     };
-  }, [containerRef, initializeTerminal, debouncedFit, enableResizeObserver, setupKeyboardHandler, cleanupKeyboardHandler]);
+  }, [containerRef, initializeTerminal, enableResizeObserver, enableKeyboardShortcuts, resizeDebounceMs]);
 
   return {
     ...state,

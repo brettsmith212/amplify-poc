@@ -33,7 +33,12 @@ export class AmplifyCommand {
       
       // Step 1: Validate prerequisites
       logger.info('Step 1: Validating environment...');
-      const validation = validateAll();
+      
+      // For development, we need to validate from the project root, not backend/
+      const workspaceForValidation = process.cwd().endsWith('/backend') ? 
+        resolve(process.cwd(), '..') : process.cwd();
+      
+      const validation = validateAll(workspaceForValidation);
       if (!validation.isValid) {
         logger.error('❌ Validation failed:', validation.error);
         process.exit(1);
@@ -61,7 +66,7 @@ export class AmplifyCommand {
       logger.info('Step 3: Setting up container environment...');
       
       this.sessionId = generateSessionId();
-      const workspaceDir = process.cwd();
+      const workspaceDir = workspaceForValidation;
       
       const envValidation = validateEnvironment(workspaceDir, this.sessionId);
       logEnvironmentStatus(envValidation);
@@ -88,7 +93,7 @@ export class AmplifyCommand {
         process.exit(1);
       }
       
-      this.containerId = runResult.containerId;
+      this.containerId = runResult.containerId!;
       logger.info('✅ Container is running', {
         sessionId: this.sessionId,
         containerId: this.containerId?.substring(0, 12)
@@ -172,7 +177,12 @@ export class AmplifyCommand {
         logger.info('Cleaning up container...');
         const containerManager = createContainerManager();
         await containerManager.stopContainer(this.containerId);
-        await containerManager.removeContainer(this.containerId);
+        
+        // Use the cleanup functionality to remove the container
+        const cleanupSuccess = await containerManager.cleanupContainer(this.containerId);
+        if (!cleanupSuccess) {
+          logger.warn('Container cleanup failed');
+        }
       }
 
       logger.info('✅ Cleanup completed');

@@ -304,6 +304,19 @@ export class ContainerManager {
   }
 
   /**
+   * Clean up a container
+   */
+  async cleanupContainer(containerId: string): Promise<boolean> {
+    try {
+      const result = await this.cleanup.cleanupContainer(containerId);
+      return result.success;
+    } catch (error) {
+      dockerLogger.error('Error cleaning up container', { containerId, error });
+      return false;
+    }
+  }
+
+  /**
    * Get the Docker instance
    */
   getDocker(): Docker {
