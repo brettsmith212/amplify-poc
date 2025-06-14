@@ -2,6 +2,8 @@
 
 import { Command } from 'commander';
 import { createImageManager } from './docker/imageManager';
+import { createContainerManager } from './docker/containerManager';
+import { validateEnvironment, logEnvironmentStatus, generateSessionId, getContainerEnvironment } from './config/environment';
 import { logger } from './utils/logger';
 import { dirname, resolve } from 'path';
 
@@ -42,9 +44,54 @@ program
       }
       
       logger.info('✅ Docker base image is ready');
+      
+      // Step 2: Validate environment and start container
+      logger.info('Step 2: Setting up container environment...');
+      
+      const sessionId = generateSessionId();
+      const workspaceDir = process.cwd();
+      
+      const envValidation = validateEnvironment(workspaceDir, sessionId);
+      logEnvironmentStatus(envValidation);
+      
+      if (!envValidation.isValid || !envValidation.config) {
+        logger.error('Environment validation failed, cannot proceed');
+        process.exit(1);
+      }
+      
+      // Create and start container
+      logger.info('Step 3: Starting container...');
+      const containerManager = createContainerManager();
+      
+      const containerConfig = {
+        sessionId: envValidation.config.sessionId,
+        workspaceDir: envValidation.config.workspaceDir,
+        environment: getContainerEnvironment(envValidation.config),
+        baseImage: 'amplify-base'
+      };
+      
+      const runResult = await containerManager.runContainer(containerConfig);
+      if (!runResult.success) {
+        logger.error('Failed to start container', { error: runResult.error });
+        process.exit(1);
+      }
+      
+      logger.info('✅ Container is running', {
+        sessionId,
+        containerId: runResult.containerId?.substring(0, 12)
+      });
+      
       logger.info('📝 Next steps (not implemented yet):');
-      logger.info('   2. Start container with current repo mounted');
-      logger.info('   3. Launch web terminal in browser');
+      logger.info('   4. Start web server');
+      logger.info('   5. Launch web terminal in browser');
+      
+      // Keep the process running
+      logger.info('🔄 Container is ready. Press Ctrl+C to stop.');
+      
+      // Simple keep-alive loop
+      setInterval(() => {
+        // This keeps the process alive and allows cleanup handlers to work
+      }, 1000);
       
     } catch (error) {
       logger.error('Error starting Amplify', error);
