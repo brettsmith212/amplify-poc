@@ -302,6 +302,13 @@ export class ContainerManager {
     
     return ports;
   }
+
+  /**
+   * Get the Docker instance
+   */
+  getDocker(): Docker {
+    return this.docker;
+  }
 }
 
 /**

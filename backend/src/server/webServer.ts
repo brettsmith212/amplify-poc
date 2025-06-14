@@ -4,6 +4,7 @@
 
 import express from 'express';
 import { createServer } from 'http';
+import { WebSocketServer } from 'ws';
 import { setupVite, getStaticMiddleware, createSpaHandler, ViteConfig } from './viteConfig';
 import {
   requestLogger,
@@ -16,6 +17,8 @@ import {
   createRateLimiter
 } from './middleware';
 import { logger } from '../utils/logger';
+import { TerminalBridge } from '../websocket/terminalBridge';
+import { DockerExecManager } from '../docker/execManager';
 
 const serverLogger = logger.child('WebServer');
 
@@ -23,6 +26,7 @@ export interface WebServerConfig {
   port: number;
   host: string;
   projectRoot: string;
+  execManager?: DockerExecManager;
 }
 
 export interface WebServerResult {
@@ -37,6 +41,8 @@ export class WebServer {
   private server?: any;
   private config: WebServerConfig;
   private viteConfig?: ViteConfig;
+  private wss?: WebSocketServer;
+  private terminalBridge?: TerminalBridge;
 
   constructor(config: WebServerConfig) {
     this.config = config;
@@ -77,6 +83,9 @@ export class WebServer {
       // Create HTTP server
       this.server = createServer(this.app);
       
+      // Setup WebSocket server
+      this.setupWebSocket();
+      
       // Start listening
       await this.listen();
       
@@ -106,6 +115,15 @@ export class WebServer {
    */
   async stop(): Promise<void> {
     return new Promise((resolve) => {
+      // Clean up WebSocket connections
+      if (this.terminalBridge) {
+        this.terminalBridge.cleanupAll();
+      }
+      
+      if (this.wss) {
+        this.wss.close();
+      }
+      
       if (this.server) {
         serverLogger.info('Stopping web server...');
         this.server.close(() => {
@@ -195,13 +213,12 @@ export class WebServer {
       });
     });
     
-    // WebSocket upgrade endpoint (placeholder for Step 7)
+    // WebSocket info endpoint
     this.app.get('/api/ws', (req, res) => {
-      res.status(501).json({
-        error: {
-          message: 'WebSocket support not implemented yet',
-          implementedIn: 'Step 7: WebSocket Bridge'
-        }
+      res.json({
+        message: 'WebSocket terminal available at ws://localhost:' + this.config.port + '/ws',
+        activeConnections: this.terminalBridge?.getActiveSessionCount() || 0,
+        ready: !!this.terminalBridge
       });
     });
     
@@ -213,6 +230,54 @@ export class WebServer {
     this.app.use(createSpaHandler(this.viteConfig));
     
     serverLogger.info('Routes configured');
+  }
+
+  /**
+   * Setup WebSocket server
+   */
+  private setupWebSocket(): void {
+    if (!this.server) {
+      throw new Error('HTTP server not initialized');
+    }
+
+    // Create WebSocket server
+    this.wss = new WebSocketServer({
+      server: this.server,
+      path: '/ws'
+    });
+
+    // Initialize terminal bridge if exec manager is available
+    if (this.config.execManager) {
+      this.terminalBridge = new TerminalBridge(this.config.execManager);
+
+      this.wss.on('connection', async (ws, request) => {
+        try {
+          const sessionId = await this.terminalBridge!.handleConnection(ws);
+          serverLogger.info(`WebSocket terminal connection established: ${sessionId}`, {
+            clientIp: request.socket.remoteAddress,
+            userAgent: request.headers['user-agent']
+          });
+        } catch (error) {
+          serverLogger.error('Failed to handle WebSocket connection:', error);
+          ws.close();
+        }
+      });
+
+      // Set up periodic ping to keep connections alive
+      const pingInterval = setInterval(() => {
+        if (this.terminalBridge) {
+          this.terminalBridge.pingAllSessions();
+        }
+      }, 30000); // Ping every 30 seconds
+
+      this.wss.on('close', () => {
+        clearInterval(pingInterval);
+      });
+
+      serverLogger.info('WebSocket server configured with terminal bridge');
+    } else {
+      serverLogger.warn('WebSocket server configured without exec manager - terminal functionality disabled');
+    }
   }
 
   /**

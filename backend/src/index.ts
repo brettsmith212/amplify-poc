@@ -4,7 +4,8 @@ import { Command } from 'commander';
 import { createImageManager } from './docker/imageManager';
 import { createContainerManager } from './docker/containerManager';
 import { validateEnvironment, logEnvironmentStatus, generateSessionId, getContainerEnvironment } from './config/environment';
-import { createWebServer } from './server/webServer';
+import { WebServer, WebServerConfig } from './server/webServer';
+import { DockerExecManager } from './docker/execManager';
 import { logger } from './utils/logger';
 import { dirname, resolve } from 'path';
 
@@ -82,9 +83,23 @@ program
         containerId: runResult.containerId?.substring(0, 12)
       });
       
-      // Step 4: Start web server
-      logger.info('Step 4: Starting web server...');
-      const webServerResult = await createWebServer(projectRoot, 3000);
+      // Step 4: Create exec manager and start web server
+      logger.info('Step 4: Starting web server with terminal support...');
+      
+      // Create exec manager for the running container
+      const docker = containerManager.getDocker();
+      const execManager = new DockerExecManager(docker, runResult.containerId!);
+      
+      // Configure web server with exec manager
+      const webServerConfig: WebServerConfig = {
+        port: 3000,
+        host: 'localhost',
+        projectRoot,
+        execManager
+      };
+      
+      const webServer = new WebServer(webServerConfig);
+      const webServerResult = await webServer.start();
       
       if (!webServerResult.success) {
         logger.error('Failed to start web server', { error: webServerResult.error });
@@ -96,7 +111,6 @@ program
       });
       
       logger.info('📝 Next steps (not implemented yet):');
-      logger.info('   5. WebSocket terminal bridge');
       logger.info('   6. Auto-launch browser');
       
       logger.info('🎉 Amplify is ready!');
