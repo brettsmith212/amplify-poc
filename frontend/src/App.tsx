@@ -1,6 +1,8 @@
+import Terminal from './components/Terminal';
+
 function App() {
   return (
-    <div className="min-h-screen bg-terminal-bg text-terminal-fg flex flex-col">
+    <div className="min-h-screen bg-gray-900 text-gray-100 flex flex-col">
       {/* Header */}
       <header className="bg-gray-800 border-b border-gray-700 px-6 py-4">
         <div className="flex items-center justify-between">
@@ -17,40 +19,20 @@ function App() {
       </header>
       
       {/* Main Terminal Area */}
-      <main className="flex-1 bg-terminal-bg p-6">
-        <div className="bg-gray-900 rounded-lg border border-gray-700 h-full min-h-96 terminal-container">
-          {/* Terminal Header */}
-          <div className="bg-gray-800 px-4 py-2 rounded-t-lg border-b border-gray-700">
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-300">Terminal</span>
-              <div className="flex items-center space-x-2">
-                <div className="w-2 h-2 bg-gray-600 rounded-full"></div>
-                <div className="w-2 h-2 bg-gray-600 rounded-full"></div>
-                <div className="w-2 h-2 bg-gray-600 rounded-full"></div>
-              </div>
-            </div>
-          </div>
-          
-          {/* Terminal Content */}
-          <div className="p-6 h-full flex items-center justify-center">
-            <div className="text-center">
-              <div className="text-4xl mb-4">🚧</div>
-              <h2 className="text-xl mb-2 text-gray-300">Terminal Component Coming Soon</h2>
-              <p className="text-gray-500 mb-4">
-                This will be implemented in Step 6 of the implementation plan
-              </p>
-              <div className="bg-gray-800 rounded-lg p-4 text-left font-mono text-sm">
-                <div className="text-green-400">$ amp --version</div>
-                <div className="text-gray-400 mt-1">0.0.1749859306-g627062</div>
-                <div className="text-green-400 mt-2">$ echo "Ready for WebSocket terminal!"</div>
-                <div className="text-gray-400 mt-1">Ready for WebSocket terminal!</div>
-                <div className="text-green-400 mt-2 flex items-center">
-                  <span>$ </span>
-                  <div className="w-2 h-4 bg-green-400 ml-1 animate-pulse"></div>
-                </div>
-              </div>
-            </div>
-          </div>
+      <main className="flex-1 flex flex-col p-6">
+        <div className="flex-1 bg-gray-900 rounded-lg border border-gray-700 overflow-hidden relative">
+          <Terminal 
+            className="h-full w-full"
+            onReady={(terminal) => {
+              console.log('Terminal ready:', terminal);
+            }}
+            onData={(data) => {
+              console.log('Terminal input:', data);
+            }}
+            onResize={(dimensions) => {
+              console.log('Terminal resized:', dimensions);
+            }}
+          />
         </div>
       </main>
       
