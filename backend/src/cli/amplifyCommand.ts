@@ -6,6 +6,9 @@ import { WebServer, WebServerConfig } from '../server/webServer';
 import { DockerExecManager } from '../docker/execManager';
 import { launchBrowserWhenReady } from './browserLauncher';
 import { logger } from '../utils/logger';
+import { AmplifyErrorHandler } from '../utils/errorHandler';
+import { setupSignalHandlers, cleanupSignalHandlers } from '../utils/signals';
+import { registerContainerCleanup, registerServerCleanup, gracefulShutdown } from './cleanup';
 import { resolve } from 'path';
 
 export interface AmplifyCommandOptions {
@@ -28,6 +31,12 @@ export class AmplifyCommand {
     const port = options.port || 3000;
     const shouldLaunchBrowser = !options.noBrowser;
 
+    // Set up signal handlers for graceful shutdown
+    setupSignalHandlers({
+      gracefulTimeoutMs: 15000, // 15 seconds for graceful shutdown
+      emergencyTimeoutMs: 5000   // 5 seconds for emergency cleanup
+    });
+
     try {
       logger.info('🚀 Starting Amplify environment...');
       
@@ -40,8 +49,15 @@ export class AmplifyCommand {
       
       const validation = validateAll(workspaceForValidation);
       if (!validation.isValid) {
-        logger.error('❌ Validation failed:', validation.error);
-        process.exit(1);
+        if (validation.error?.includes('git repository')) {
+          throw AmplifyErrorHandler.gitRepoNotFound(workspaceForValidation);
+        } else if (validation.error?.includes('AMP_API_KEY')) {
+          throw AmplifyErrorHandler.missingEnvVar('AMP_API_KEY');
+        } else if (validation.error?.includes('Docker')) {
+          throw AmplifyErrorHandler.dockerNotAvailable();
+        } else {
+          throw AmplifyErrorHandler.unexpectedError(new Error(validation.error || 'Validation failed'));
+        }
       }
 
       // Step 2: Ensure Docker base image
@@ -50,14 +66,14 @@ export class AmplifyCommand {
       
       const dockerAvailable = await imageManager.isDockerAvailable();
       if (!dockerAvailable) {
-        logger.error('❌ Docker is not available. Please ensure Docker is installed and running.');
-        process.exit(1);
+        throw AmplifyErrorHandler.dockerNotAvailable();
       }
       
       const imageResult = await imageManager.ensureImage();
       if (!imageResult.exists) {
-        logger.error('❌ Failed to ensure base image is available', { error: imageResult.error });
-        process.exit(1);
+        throw AmplifyErrorHandler.imageBuildFailed(
+          imageResult.error ? new Error(imageResult.error) : undefined
+        );
       }
       
       logger.info('✅ Docker base image is ready');
@@ -72,8 +88,7 @@ export class AmplifyCommand {
       logEnvironmentStatus(envValidation);
       
       if (!envValidation.isValid || !envValidation.config) {
-        logger.error('❌ Environment validation failed, cannot proceed');
-        process.exit(1);
+        throw AmplifyErrorHandler.missingEnvVar('AMP_API_KEY');
       }
 
       // Step 4: Start container
@@ -89,11 +104,17 @@ export class AmplifyCommand {
       
       const runResult = await containerManager.runContainer(containerConfig);
       if (!runResult.success) {
-        logger.error('❌ Failed to start container', { error: runResult.error });
-        process.exit(1);
+        throw AmplifyErrorHandler.containerStartFailed(
+          runResult.containerId,
+          runResult.error ? new Error(runResult.error) : undefined
+        );
       }
       
       this.containerId = runResult.containerId!;
+      
+      // Register container for cleanup
+      registerContainerCleanup(this.containerId, this.sessionId);
+      
       logger.info('✅ Container is running', {
         sessionId: this.sessionId,
         containerId: this.containerId?.substring(0, 12)
@@ -116,9 +137,14 @@ export class AmplifyCommand {
       const webServerResult = await this.webServer.start();
       
       if (!webServerResult.success) {
-        logger.error('❌ Failed to start web server', { error: webServerResult.error });
-        process.exit(1);
+        throw AmplifyErrorHandler.webServerStartFailed(
+          port,
+          webServerResult.error ? new Error(webServerResult.error) : undefined
+        );
       }
+      
+      // Register web server for cleanup
+      registerServerCleanup('main-server', this.webServer);
       
       logger.info('✅ Web server is running', { url: webServerResult.url });
 
@@ -130,66 +156,38 @@ export class AmplifyCommand {
         if (browserResult.success) {
           logger.info('✅ Browser launched successfully');
         } else {
-          logger.warn('⚠️  Failed to launch browser automatically:', browserResult.error);
+          // Browser launch failure is not fatal
+          AmplifyErrorHandler.warn(
+            'Failed to launch browser automatically',
+            ['Open your browser manually and navigate to: ' + webServerResult.url]
+          );
         }
       }
 
-      // Setup graceful shutdown
-      this.setupGracefulShutdown();
-
-      logger.info('🎉 Amplify is ready!');
-      logger.info(`🌐 Terminal available at: ${webServerResult.url}`);
+      AmplifyErrorHandler.success('Amplify is ready!');
+      AmplifyErrorHandler.info(`🌐 Terminal available at: ${webServerResult.url}`);
       if (!shouldLaunchBrowser) {
-        logger.info('💡 Open your browser to the URL above to access the terminal');
+        AmplifyErrorHandler.info('💡 Open your browser to the URL above to access the terminal');
       }
-      logger.info('🔄 Press Ctrl+C to stop.');
+      AmplifyErrorHandler.info('🔄 Press Ctrl+C to stop.');
 
       // Keep process alive
       this.keepAlive();
 
     } catch (error) {
-      logger.error('❌ Error starting Amplify:', error);
-      await this.cleanup();
-      process.exit(1);
+      // Clean up signal handlers
+      cleanupSignalHandlers();
+      
+      // Handle the error appropriately
+      if (AmplifyErrorHandler.isAmplifyError(error)) {
+        AmplifyErrorHandler.handle(error, 'AmplifyCommand.execute');
+      } else {
+        AmplifyErrorHandler.handle(error instanceof Error ? error : new Error(String(error)), 'AmplifyCommand.execute');
+      }
     }
   }
 
-  private setupGracefulShutdown(): void {
-    const cleanup = async () => {
-      logger.info('🛑 Shutting down gracefully...');
-      await this.cleanup();
-      process.exit(0);
-    };
 
-    process.on('SIGINT', cleanup);
-    process.on('SIGTERM', cleanup);
-    process.on('SIGHUP', cleanup);
-  }
-
-  private async cleanup(): Promise<void> {
-    try {
-      if (this.webServer) {
-        logger.info('Stopping web server...');
-        await this.webServer.stop();
-      }
-
-      if (this.containerId) {
-        logger.info('Cleaning up container...');
-        const containerManager = createContainerManager();
-        await containerManager.stopContainer(this.containerId);
-        
-        // Use the cleanup functionality to remove the container
-        const cleanupSuccess = await containerManager.cleanupContainer(this.containerId);
-        if (!cleanupSuccess) {
-          logger.warn('Container cleanup failed');
-        }
-      }
-
-      logger.info('✅ Cleanup completed');
-    } catch (error) {
-      logger.error('Error during cleanup:', error);
-    }
-  }
 
   private keepAlive(): void {
     // Simple keep-alive to prevent process from exiting
