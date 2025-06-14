@@ -31,7 +31,7 @@
 
 ## Core CLI Implementation
 
-- [ ] Step 3: Implement Docker Image Management
+- [x] Step 3: Implement Docker Image Management
 
   - **Task**: Create functionality to check if amplify-base image exists, build it if missing, and handle Docker operations using dockerode library.
   - **Description**: Handles the Docker image lifecycle management as specified in the PRD, ensuring the base image is available before running containers.
