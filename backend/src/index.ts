@@ -4,6 +4,7 @@ import { Command } from 'commander';
 import { createImageManager } from './docker/imageManager';
 import { createContainerManager } from './docker/containerManager';
 import { validateEnvironment, logEnvironmentStatus, generateSessionId, getContainerEnvironment } from './config/environment';
+import { createWebServer } from './server/webServer';
 import { logger } from './utils/logger';
 import { dirname, resolve } from 'path';
 
@@ -81,12 +82,26 @@ program
         containerId: runResult.containerId?.substring(0, 12)
       });
       
-      logger.info('📝 Next steps (not implemented yet):');
-      logger.info('   4. Start web server');
-      logger.info('   5. Launch web terminal in browser');
+      // Step 4: Start web server
+      logger.info('Step 4: Starting web server...');
+      const webServerResult = await createWebServer(projectRoot, 3000);
       
-      // Keep the process running
-      logger.info('🔄 Container is ready. Press Ctrl+C to stop.');
+      if (!webServerResult.success) {
+        logger.error('Failed to start web server', { error: webServerResult.error });
+        process.exit(1);
+      }
+      
+      logger.info('✅ Web server is running', {
+        url: webServerResult.url
+      });
+      
+      logger.info('📝 Next steps (not implemented yet):');
+      logger.info('   5. WebSocket terminal bridge');
+      logger.info('   6. Auto-launch browser');
+      
+      logger.info('🎉 Amplify is ready!');
+      logger.info(`🌐 Open your browser to: ${webServerResult.url}`);
+      logger.info('🔄 Press Ctrl+C to stop.');
       
       // Simple keep-alive loop
       setInterval(() => {

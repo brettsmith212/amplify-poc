@@ -54,7 +54,7 @@
 
 ## Web Server and Terminal Interface
 
-- [ ] Step 5: Create Web Server with Vite Integration
+- [x] Step 5: Create Web Server with Vite Integration
 
   - **Task**: Implement Express server to serve Vite-built React app on localhost:3000 with WebSocket upgrade capability, including dev mode proxy for hot reload.
   - **Description**: Provides the web interface foundation that will host the React terminal UI and handle WebSocket connections, with development mode supporting Vite's hot reload.
