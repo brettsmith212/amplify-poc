@@ -44,7 +44,7 @@ export function authenticateUser(req: Request, res: Response, next: NextFunction
     email: payload.email,
     name: payload.name || '',
     avatarUrl: payload.avatarUrl || '',
-    accessToken: '', // Access tokens are retrieved securely via OAuth flow, not stored in JWT
+    accessToken: payload.accessToken || '', // Use access token from JWT payload (for testing)
     scopes: payload.scopes || [],
     createdAt: new Date(payload.iat * 1000),
     lastLoginAt: new Date(),
