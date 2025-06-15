@@ -8,6 +8,7 @@ import { WebSocketServer } from 'ws';
 import cookieParser from 'cookie-parser';
 import compression from 'compression';
 import helmet from 'helmet';
+import passport from 'passport';
 
 import webConfig, { validateConfig } from './config/webConfig';
 import { sessionStore } from './services/sessionStore';
@@ -25,6 +26,9 @@ import {
   jsonParseErrorHandler,
   createRateLimiter
 } from './server/middleware';
+
+import { authenticateUser, logAuthEvents } from './middleware/auth';
+import authRoutes from './routes/auth';
 
 const appLogger = logger.child('WebApp');
 
@@ -94,6 +98,9 @@ export class WebApp {
     // Cookie parser
     this.app.use(cookieParser(webConfig.security.cookieSecret));
     
+    // Passport initialization
+    this.app.use(passport.initialize());
+    
     // Request logging
     this.app.use(requestLogger);
     
@@ -111,6 +118,12 @@ export class WebApp {
     this.app.use(express.json({ limit: '10mb' }));
     this.app.use(jsonParseErrorHandler);
     this.app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+    
+    // Authentication middleware (optional - adds user to req if authenticated)
+    this.app.use(authenticateUser);
+    
+    // Authentication event logging
+    this.app.use(logAuthEvents);
     
     // Setup routes
     this.setupRoutes();
@@ -168,8 +181,8 @@ export class WebApp {
       });
     });
 
-    // TODO: Add authentication routes
-    // this.app.use('/auth', authRoutes);
+    // Authentication routes
+    this.app.use('/auth', authRoutes);
     
     // TODO: Add GitHub API routes
     // this.app.use('/api/github', githubRoutes);

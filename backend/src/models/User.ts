@@ -10,7 +10,7 @@ export interface User {
   name?: string;
   avatarUrl?: string;
   accessToken: string;
-  refreshToken?: string;
+  refreshToken?: string | undefined;
   tokenExpiresAt?: Date;
   scopes: string[];
   createdAt: Date;
@@ -64,12 +64,12 @@ export interface GitHubRepository {
   id: number;
   name: string;
   fullName: string;
-  description?: string;
+  description?: string | undefined;
   private: boolean;
   htmlUrl: string;
   cloneUrl: string;
   defaultBranch: string;
-  language?: string;
+  language?: string | undefined;
   stargazersCount: number;
   forksCount: number;
   updatedAt: Date;
