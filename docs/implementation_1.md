@@ -127,35 +127,6 @@
   - **Step Dependencies**: Step 9
   - **User Instructions**: Test various failure scenarios and exit methods
 
-## Testing and Documentation
-
-- [ ] Step 11: Implement Unit Tests
-
-  - **Task**: Create comprehensive unit tests for backend (Docker, WebSocket, CLI) using Jest and frontend (React components, hooks) using Vitest and React Testing Library.
-  - **Description**: Ensures code reliability and maintainability with comprehensive test coverage for both backend and frontend functionality.
-  - **Files**:
-    - `backend/jest.config.js`: Jest configuration for backend TypeScript and Node.js testing
-    - `frontend/vitest.config.ts`: Vitest configuration for frontend React component testing
-    - `backend/src/__tests__/docker.test.ts`: Docker operation unit tests
-    - `backend/src/__tests__/websocket.test.ts`: WebSocket and terminal bridge tests
-    - `backend/src/__tests__/cli.test.ts`: CLI command and integration tests
-    - `frontend/src/components/__tests__/Terminal.test.tsx`: Terminal component tests
-    - `frontend/src/hooks/__tests__/useWebSocket.test.ts`: WebSocket hook tests
-  - **Step Dependencies**: Step 10
-  - **User Instructions**: Run `cd backend && npm test` for backend tests and `cd frontend && npm test` for frontend tests
-
-- [ ] Step 12: Create Integration Tests and Final Polish
-  - **Task**: Implement end-to-end integration tests, finalize documentation, and add build/packaging scripts for both backend and frontend.
-  - **Description**: Validates the complete workflow and prepares the tool for distribution with proper documentation and packaging, including frontend build process.
-  - **Files**:
-    - `backend/src/__tests__/integration.test.ts`: End-to-end workflow testing
-    - `README.md`: Complete documentation with usage examples and troubleshooting
-    - `scripts/build.sh`: Build script for backend TypeScript compilation and frontend Vite build
-    - `scripts/test-e2e.sh`: End-to-end testing script
-    - `scripts/dev.sh`: Development script for concurrent backend/frontend development
-  - **Step Dependencies**: Step 11
-  - **User Instructions**: Run full integration tests and verify all Definition of Done criteria
-
 ## Summary
 
 This implementation plan breaks down the Amplify POC into 12 manageable steps that can be executed sequentially. The approach follows the PRD's architecture closely:
