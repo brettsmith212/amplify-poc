@@ -1,10 +1,13 @@
 # Implementation Plan - Amplify Phase 2
 
 ## Project Foundation (Building on Phase 1)
+
 - [x] ~~Step 1: Project Structure & Basic Configuration~~ (Already complete from Phase 1)
-  - Phase 1 already established TypeScript monorepo with frontend (React+Vite+TailwindCSS) and backend (Node.js+Express) 
+
+  - Phase 1 already established TypeScript monorepo with frontend (React+Vite+TailwindCSS) and backend (Node.js+Express)
 
 - [x] ~~Step 2: Docker Base Image Setup~~ (Already complete from Phase 1)
+
   - Phase 1 already created `Dockerfile.base` with Ubuntu 24.04, amp CLI, and build script
 
 - [x] ~~Step 3: Backend Server Setup~~ (Already complete from Phase 1)
@@ -12,7 +15,7 @@
 
 ## Phase 2 Extensions - Web-First Multi-Session Architecture
 
-- [ ] Step 1: Upgrade Backend for Multi-Session Support
+- [x] Step 1: Upgrade Backend for Multi-Session Support
   - **Task**: Transform the existing single-session CLI tool into a multi-session web service with proper session management
   - **Description**: Extend the existing backend to support multiple concurrent sessions, user isolation, and persistent session state management
   - **Files**:
@@ -27,7 +30,9 @@
   - **User Instructions**: None
 
 ## GitHub Integration
+
 - [ ] Step 2: GitHub OAuth Implementation
+
   - **Task**: Implement GitHub OAuth flow with proper token storage and user authentication
   - **Description**: Set up complete GitHub OAuth integration including login, callback handling, and secure token storage in HTTP-only cookies
   - **Files**:
@@ -51,10 +56,13 @@
   - **User Instructions**: None
 
 ## Session Management (Extending Phase 1)
+
 - [x] ~~Docker Container Management~~ (Already exists from Phase 1)
+
   - Phase 1 already has Docker container lifecycle management in `backend/src/docker/`
 
-- [x] ~~WebSocket Terminal Bridge~~ (Already exists from Phase 1) 
+- [x] ~~WebSocket Terminal Bridge~~ (Already exists from Phase 1)
+
   - Phase 1 already has WebSocket terminal bridge in `backend/src/websocket/`
 
 - [ ] Step 4: Multi-Session API Endpoints
@@ -69,10 +77,13 @@
   - **User Instructions**: None
 
 ## Frontend Transformation (Building on Phase 1 Terminal)
+
 - [x] ~~React App & Terminal Setup~~ (Already exists from Phase 1)
+
   - Phase 1 already has React app with xterm.js terminal component and WebSocket integration
 
 - [ ] Step 5: Add React Router and Multi-Page Navigation
+
   - **Task**: Transform the existing single-page terminal app into a multi-page application with routing
   - **Description**: Add React Router to support multiple pages (login, create session, dashboard, terminal, diff viewer) while preserving existing terminal functionality
   - **Files**:
@@ -98,7 +109,9 @@
   - **User Instructions**: None
 
 ## Session Creation & Management UI
+
 - [ ] Step 7: Session Creation Form
+
   - **Task**: Implement the session creation form with repository/branch selection and prompt input
   - **Description**: Create a comprehensive form that allows users to select repositories, branches, and enter prompts with validation and auto-completion
   - **Files**:
@@ -124,7 +137,9 @@
   - **User Instructions**: None
 
 ## Terminal Integration (Extending Phase 1)
+
 - [x] ~~Terminal Component~~ (Already exists from Phase 1)
+
   - Phase 1 already has xterm.js terminal component with WebSocket connection
 
 - [ ] Step 9: Multi-Session Terminal Support
@@ -138,7 +153,9 @@
   - **User Instructions**: None
 
 ## Diff Viewer & Git Operations
+
 - [ ] Step 10: Monaco Diff Viewer
+
   - **Task**: Implement Monaco editor for displaying diffs and file changes
   - **Description**: Create a diff viewer using Monaco editor that shows changes made during coding sessions with syntax highlighting
   - **Files**:
@@ -165,7 +182,9 @@
   - **User Instructions**: None
 
 ## Polish & Testing
+
 - [ ] Step 12: Error Handling & Loading States
+
   - **Task**: Implement comprehensive error handling and loading states throughout the application
   - **Description**: Add proper error boundaries, loading spinners, and user-friendly error messages for all async operations
   - **Files**:
@@ -178,6 +197,7 @@
   - **User Instructions**: None
 
 - [ ] Step 13: End-to-End Testing
+
   - **Task**: Implement comprehensive end-to-end tests covering the complete user workflow
   - **Description**: Create E2E tests that validate the entire user journey from login to session completion
   - **Files**:
@@ -213,6 +233,7 @@ This implementation plan breaks down the Amplify Phase 2 development into 14 man
 4. **Progressive Enhancement**: Adding new features while preserving existing functionality
 
 **Key Phase 1 Assets Being Reused**:
+
 - Complete Docker container management (`backend/src/docker/`)
 - WebSocket terminal bridge (`backend/src/websocket/`)
 - React terminal component with xterm.js (`frontend/src/components/Terminal.tsx`)
@@ -220,6 +241,7 @@ This implementation plan breaks down the Amplify Phase 2 development into 14 man
 - Build tooling and TypeScript configurations
 
 **Phase 2 Additions**:
+
 - GitHub OAuth integration and user authentication
 - Multi-session architecture with proper isolation
 - Repository cloning and branch selection
