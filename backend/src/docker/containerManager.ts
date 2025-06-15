@@ -60,8 +60,7 @@ export class ContainerManager {
         WorkingDir: '/workspace',
         User: 'amplify',
         HostConfig: {
-          // Mount workspace read-only as specified in PRD
-          Binds: [`${config.workspaceDir}:/workspace:ro`],
+          // No special mounts needed - regular container filesystem is ephemeral and writable
           // Expose ports for potential web server and SSH
           PortBindings: {
             '22/tcp': [{ HostPort: '' }], // Dynamic port assignment
@@ -195,6 +194,12 @@ export class ContainerManager {
     // Set up cleanup handlers for graceful shutdown
     this.cleanup.setupCleanupHandlers(createResult.container.id);
 
+    // Copy host repository files to container workspace
+    const copySuccess = await this.copyFilesToWorkspace(createResult.container.id, config.workspaceDir);
+    if (!copySuccess) {
+      dockerLogger.warn('Failed to copy files to workspace, but container is still usable');
+    }
+
     dockerLogger.info('Container is running and ready', {
       sessionId: config.sessionId,
       containerId: createResult.container.id.substring(0, 12)
@@ -242,6 +247,46 @@ export class ContainerManager {
       timeout: 10 
     });
     return result.success;
+  }
+
+  /**
+   * Copy files from host to container workspace
+   */
+  async copyFilesToWorkspace(containerId: string, sourceDir: string): Promise<boolean> {
+    try {
+      dockerLogger.info(`Copying files from ${sourceDir} to container workspace`);
+      
+      const container = this.docker.getContainer(containerId);
+      
+      // Create a tar archive of the source directory
+      const { execSync } = require('child_process');
+      const path = require('path');
+      const fs = require('fs');
+      
+      // Create temporary tar file
+      const tarPath = `/tmp/workspace-${Date.now()}.tar`;
+      
+      // Create tar archive excluding .git and node_modules for efficiency
+      execSync(`tar -cf "${tarPath}" -C "${sourceDir}" --exclude='.git' --exclude='node_modules' --exclude='dist' --exclude='build' .`, {
+        stdio: 'pipe'
+      });
+      
+      // Read tar file and put it into container
+      const tarStream = fs.createReadStream(tarPath);
+      await container.putArchive(tarStream, { path: '/workspace' });
+      
+      // Clean up temporary tar file
+      fs.unlinkSync(tarPath);
+      
+      dockerLogger.info(`Successfully copied files to container ${containerId.substring(0, 12)}`);
+      return true;
+    } catch (error: any) {
+      dockerLogger.error(`Failed to copy files to container: ${containerId.substring(0, 12)}`, {
+        sourceDir,
+        error: error.message
+      });
+      return false;
+    }
   }
 
   /**

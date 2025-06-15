@@ -16,7 +16,17 @@ RUN npm install -g @sourcegraph/amp
 
 # Safety - create user first
 RUN useradd -ms /bin/bash amplify
+
+# Create workspace directory
+RUN mkdir -p /workspace
+RUN chown amplify:amplify /workspace
+
 USER amplify
+
+# Set up shell environment
+RUN echo 'export PS1="\[\033[1;32m\][amplify]\[\033[0m\] \w $ "' >> ~/.bashrc
+RUN echo 'echo "Welcome to Amplify container! Your project files are in /workspace (writable)"' >> ~/.bashrc
+RUN echo 'echo "You can freely create, edit, and modify files here without affecting the host."' >> ~/.bashrc
 
 # Optional Go toolchain for agent helpers
 # RUN curl -sSfL https://go.dev/dl/go1.24.3.linux-amd64.tar.gz | tar -xz -C /usr/local
