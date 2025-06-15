@@ -8,7 +8,7 @@ import {
   verifyJWT, 
   clearAuthCookie 
 } from '../auth/github';
-import { AuthenticatedUser } from '../models/User';
+import { AuthenticatedUser, TerminalTheme, EditorTheme } from '../models/User';
 import { logger } from '../utils/logger';
 
 const authLogger = logger.child('AuthMiddleware');
@@ -44,7 +44,7 @@ export function authenticateUser(req: Request, res: Response, next: NextFunction
     email: payload.email,
     name: payload.name || '',
     avatarUrl: payload.avatarUrl || '',
-    accessToken: '', // Not stored in JWT for security
+    accessToken: '', // Access tokens are retrieved securely via OAuth flow, not stored in JWT
     scopes: payload.scopes || [],
     createdAt: new Date(payload.iat * 1000),
     lastLoginAt: new Date(),
@@ -60,8 +60,8 @@ export function authenticateUser(req: Request, res: Response, next: NextFunction
       following: 0
     },
     preferences: payload.preferences || {
-      terminalTheme: 'dark',
-      editorTheme: 'vs-dark',
+      terminalTheme: TerminalTheme.DARK,
+      editorTheme: EditorTheme.VS_DARK,
       sessionTimeout: 240,
       autoSaveInterval: 30,
       notifications: {

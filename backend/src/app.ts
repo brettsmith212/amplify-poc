@@ -29,6 +29,7 @@ import {
 
 import { authenticateUser, logAuthEvents } from './middleware/auth';
 import authRoutes from './routes/auth';
+import githubRoutes from './routes/github';
 
 const appLogger = logger.child('WebApp');
 
@@ -184,8 +185,8 @@ export class WebApp {
     // Authentication routes
     this.app.use('/auth', authRoutes);
     
-    // TODO: Add GitHub API routes
-    // this.app.use('/api/github', githubRoutes);
+    // GitHub API routes
+    this.app.use('/api/github', githubRoutes);
     
     // TODO: Add session routes
     // this.app.use('/api/sessions', sessionRoutes);
