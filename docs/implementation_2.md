@@ -65,7 +65,7 @@
 
   - Phase 1 already has WebSocket terminal bridge in `backend/src/websocket/`
 
-- [ ] Step 4: Multi-Session API Endpoints
+- [x] Step 4: Multi-Session API Endpoints
   - **Task**: Implement REST API endpoints for multi-session CRUD operations with user authentication
   - **Description**: Create session management endpoints that handle multiple concurrent sessions per user, with proper isolation and GitHub repo cloning
   - **Files**:
