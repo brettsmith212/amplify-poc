@@ -6,15 +6,7 @@ import { useAuth } from './hooks/useAuth';
 
 import LoginPage from './pages/LoginPage';
 import CreateSessionPage from './pages/CreateSessionPage';
-
-const SessionsPage = () => (
-  <div className="flex-1 flex items-center justify-center">
-    <div className="text-center">
-      <h1 className="text-2xl font-bold text-white mb-4">Sessions Dashboard</h1>
-      <p className="text-gray-400">Session management will be implemented in Step 8</p>
-    </div>
-  </div>
-);
+import SessionsPage from './pages/SessionsPage';
 
 
 
@@ -64,7 +56,7 @@ const AppContent = () => {
             }
           />
           <Route
-            path="/create"
+            path="/create-session"
             element={
               <ProtectedRoute>
                 <CreateSessionPage />

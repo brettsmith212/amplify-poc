@@ -43,9 +43,9 @@ const Layout = () => {
                 Sessions
               </Link>
               <Link
-                to="/create"
+                to="/create-session"
                 className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                  isActivePath('/create')
+                  isActivePath('/create-session')
                     ? 'bg-gray-700 text-white'
                     : 'text-gray-300 hover:text-white hover:bg-gray-700/50'
                 }`}

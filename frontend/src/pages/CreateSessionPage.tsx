@@ -88,7 +88,7 @@ export const CreateSessionPage: React.FC = () => {
     setSubmitError(null);
 
     try {
-      const response = await api.post('/api/sessions', {
+      const response = await api.post('/sessions', {
         sessionName: formData.sessionName,
         repositoryUrl: formData.repository!.cloneUrl, // Use HTTPS clone URL
         branch: formData.branch,
