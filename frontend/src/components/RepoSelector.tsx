@@ -86,7 +86,7 @@ export const RepoSelector: React.FC<RepoSelectorProps> = ({
     const newQuery = e.target.value;
     setQuery(newQuery);
     
-    if (newQuery !== (value?.full_name || '')) {
+    if (newQuery !== (value?.fullName || '')) {
       onChange(null);
     }
     
@@ -136,7 +136,7 @@ export const RepoSelector: React.FC<RepoSelectorProps> = ({
 
   const selectRepository = (repo: Repository) => {
     onChange(repo);
-    setQuery(repo.full_name);
+    setQuery(repo.fullName);
     setIsOpen(false);
     setSelectedIndex(-1);
     inputRef.current?.blur();
@@ -158,7 +158,7 @@ export const RepoSelector: React.FC<RepoSelectorProps> = ({
   // Update input when value changes externally
   useEffect(() => {
     if (value) {
-      setQuery(value.full_name);
+      setQuery(value.fullName);
     } else if (!isOpen) {
       setQuery('');
     }
@@ -225,13 +225,13 @@ export const RepoSelector: React.FC<RepoSelectorProps> = ({
                   >
                     <div className="flex items-center space-x-3">
                       <img
-                        src={repo.owner.avatar_url}
+                        src={repo.owner.avatarUrl}
                         alt={repo.owner.login}
                         className="w-6 h-6 rounded-full"
                       />
                       <div className="flex-1 min-w-0">
                         <div className="font-medium text-sm truncate">
-                          {repo.full_name}
+                          {repo.fullName}
                         </div>
                         {repo.description && (
                           <div className="text-xs text-gray-500 truncate">

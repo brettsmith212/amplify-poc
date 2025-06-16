@@ -26,7 +26,7 @@ class AuthService {
    */
   async checkAuthStatus(): Promise<User | null> {
     try {
-      const response = await api.get<User>('/auth/user');
+      const response = await api.get<User>('/auth/me');
       
       if (response.success && response.data) {
         return response.data;
@@ -63,7 +63,7 @@ class AuthService {
    */
   async handleAuthCallback(): Promise<AuthResponse> {
     try {
-      const response = await api.get<User>('/auth/user');
+      const response = await api.get<User>('/auth/me');
       
       if (response.success && response.data) {
         // Clear any stored return URL

@@ -4,18 +4,25 @@ import { useAuth } from './useAuth';
 export interface Repository {
   id: number;
   name: string;
-  full_name: string;
-  description: string | null;
+  fullName: string;
+  description?: string;
   private: boolean;
   owner: {
     login: string;
-    avatar_url: string;
+    avatarUrl: string;
   };
-  clone_url: string;
-  ssh_url: string;
-  default_branch: string;
-  updated_at: string;
-  language: string | null;
+  cloneUrl: string;
+  defaultBranch: string;
+  updatedAt: Date;
+  language?: string;
+  htmlUrl: string;
+  stargazersCount: number;
+  forksCount: number;
+  permissions: {
+    admin: boolean;
+    push: boolean;
+    pull: boolean;
+  };
 }
 
 export interface Branch {

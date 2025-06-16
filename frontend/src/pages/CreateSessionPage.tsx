@@ -90,7 +90,7 @@ export const CreateSessionPage: React.FC = () => {
     try {
       const response = await api.post('/api/sessions', {
         sessionName: formData.sessionName,
-        repositoryUrl: formData.repository!.clone_url, // Use HTTPS clone URL
+        repositoryUrl: formData.repository!.cloneUrl, // Use HTTPS clone URL
         branch: formData.branch,
         prompt: formData.prompt,
       });
@@ -116,7 +116,7 @@ export const CreateSessionPage: React.FC = () => {
     setFormData(prev => ({
       ...prev,
       repository,
-      branch: repository?.default_branch || '', // Auto-select default branch
+      branch: repository?.defaultBranch || '', // Auto-select default branch
     }));
     
     if (errors.repository) {
@@ -181,13 +181,13 @@ export const CreateSessionPage: React.FC = () => {
             <div className="mt-2 p-3 bg-gray-50 rounded-md border">
               <div className="flex items-center space-x-3">
                 <img
-                  src={formData.repository.owner.avatar_url}
+                  src={formData.repository.owner.avatarUrl}
                   alt={formData.repository.owner.login}
                   className="w-8 h-8 rounded-full"
                 />
                 <div>
                   <div className="font-medium text-sm">
-                    {formData.repository.full_name}
+                    {formData.repository.fullName}
                   </div>
                   {formData.repository.description && (
                     <div className="text-xs text-gray-500">

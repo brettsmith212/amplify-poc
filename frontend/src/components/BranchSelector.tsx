@@ -50,8 +50,8 @@ export const BranchSelector: React.FC<BranchSelectorProps> = ({
         setFilteredBranches(branchList);
         
         // Auto-select default branch if no value is set
-        if (!value && repository.default_branch) {
-          onChange(repository.default_branch);
+        if (!value && repository.defaultBranch) {
+          onChange(repository.defaultBranch);
         }
       } catch (err) {
         console.error('Error loading branches:', err);
@@ -243,7 +243,7 @@ export const BranchSelector: React.FC<BranchSelectorProps> = ({
                       </span>
                     </div>
                     <div className="flex items-center space-x-2">
-                      {branch.name === repository.default_branch && (
+                      {branch.name === repository.defaultBranch && (
                         <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">
                           default
                         </span>

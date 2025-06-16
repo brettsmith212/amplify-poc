@@ -147,7 +147,12 @@ export function generateJWT(user: AuthenticatedUser): string {
     githubId: user.githubId,
     username: user.username,
     email: user.email,
+    name: user.name,
+    avatarUrl: user.avatarUrl,
+    accessToken: user.accessToken,
     scopes: user.scopes,
+    profile: user.profile,
+    preferences: user.preferences,
     iat: Math.floor(Date.now() / 1000)
   };
 

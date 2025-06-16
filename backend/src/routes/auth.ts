@@ -116,7 +116,10 @@ router.get('/me', (req: Request, res: Response) => {
     lastLoginAt: user.lastLoginAt
   };
 
-  res.json({ user: safeUser });
+  res.json({ 
+    success: true,
+    data: safeUser 
+  });
 });
 
 /**

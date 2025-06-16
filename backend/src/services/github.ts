@@ -73,6 +73,10 @@ export class GitHubService {
           admin: repo.permissions?.admin || false,
           push: repo.permissions?.push || false,
           pull: repo.permissions?.pull || false
+        },
+        owner: {
+          login: repo.owner.login,
+          avatarUrl: repo.owner.avatar_url
         }
       }));
 
@@ -204,6 +208,10 @@ export class GitHubService {
           admin: response.data.permissions?.admin || false,
           push: response.data.permissions?.push || false,
           pull: response.data.permissions?.pull || false
+        },
+        owner: {
+          login: response.data.owner?.login || '',
+          avatarUrl: response.data.owner?.avatar_url || ''
         }
       };
 
@@ -290,6 +298,10 @@ export class GitHubService {
           admin: false, // Search results don't include permissions
           push: false,
           pull: true
+        },
+        owner: {
+          login: repo.owner?.login || '',
+          avatarUrl: repo.owner?.avatar_url || ''
         }
       }));
 

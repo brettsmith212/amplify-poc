@@ -74,6 +74,10 @@ export interface GitHubRepository {
   forksCount: number;
   updatedAt: Date;
   permissions: RepositoryPermissions;
+  owner: {
+    login: string;
+    avatarUrl: string;
+  };
 }
 
 export interface RepositoryPermissions {
