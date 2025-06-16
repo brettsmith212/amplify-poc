@@ -26,11 +26,10 @@ class AuthService {
    */
   async checkAuthStatus(): Promise<User | null> {
     try {
-      const response = await api.get('/auth/user');
+      const response = await api.get<User>('/auth/user');
       
-      if (response.ok) {
-        const userData = await response.json();
-        return userData;
+      if (response.success && response.data) {
+        return response.data;
       }
       
       return null;
@@ -64,22 +63,19 @@ class AuthService {
    */
   async handleAuthCallback(): Promise<AuthResponse> {
     try {
-      const response = await api.get('/auth/user');
+      const response = await api.get<User>('/auth/user');
       
-      if (response.ok) {
-        const userData = await response.json();
-        
+      if (response.success && response.data) {
         // Clear any stored return URL
         sessionStorage.removeItem('returnUrl');
         
         return {
-          user: userData,
+          user: response.data,
           success: true,
           message: 'Login successful'
         };
       } else {
-        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
-        throw new Error(errorData.error || 'Authentication failed');
+        throw new Error(response.message || response.error || 'Authentication failed');
       }
     } catch (error) {
       console.error('Auth callback handling failed:', error);

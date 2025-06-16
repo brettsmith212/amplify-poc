@@ -5,6 +5,7 @@ import TerminalPage from './pages/TerminalPage';
 import { useAuth } from './hooks/useAuth';
 
 import LoginPage from './pages/LoginPage';
+import CreateSessionPage from './pages/CreateSessionPage';
 
 const SessionsPage = () => (
   <div className="flex-1 flex items-center justify-center">
@@ -15,14 +16,7 @@ const SessionsPage = () => (
   </div>
 );
 
-const CreateSessionPage = () => (
-  <div className="flex-1 flex items-center justify-center">
-    <div className="text-center">
-      <h1 className="text-2xl font-bold text-white mb-4">Create New Session</h1>
-      <p className="text-gray-400">Session creation form will be implemented in Step 7</p>
-    </div>
-  </div>
-);
+
 
 // Protected Route wrapper
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
