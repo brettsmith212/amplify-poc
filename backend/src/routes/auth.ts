@@ -187,7 +187,8 @@ router.put('/preferences', (req: Request, res: Response) => {
  */
 function getFrontendUrl(): string {
   if (webConfig.development.isDevelopment) {
-    return `http://${webConfig.server.host}:${webConfig.server.port}`;
+    // In development, frontend runs on port 5173 (Vite dev server)
+    return `http://${webConfig.server.host}:5173`;
   }
   return `https://${webConfig.server.host}`;
 }

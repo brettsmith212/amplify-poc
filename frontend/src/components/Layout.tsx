@@ -61,11 +61,11 @@ const Layout = () => {
               <div className="flex items-center space-x-4">
                 <div className="flex items-center space-x-2">
                   <img
-                    src={user.avatar_url}
-                    alt={user.login}
+                    src={user.avatarUrl}
+                    alt={user.username}
                     className="w-6 h-6 rounded-full"
                   />
-                  <span className="text-gray-300">{user.login}</span>
+                  <span className="text-gray-300">{user.username}</span>
                 </div>
                 <button
                   onClick={logout}

@@ -1,12 +1,11 @@
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { api } from '../utils/api';
 
 interface User {
   id: number;
-  login: string;
+  username: string;
   name: string;
   email: string;
-  avatar_url: string;
+  avatarUrl: string;
 }
 
 interface AuthContextType {
@@ -29,10 +28,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const checkAuth = async () => {
     try {
-      const response = await api.get('/auth/user');
+      // Call auth endpoint directly (bypassing API base URL)
+      const response = await fetch('/auth/me', {
+        credentials: 'include', // Include cookies for authentication
+      });
+      
       if (response.ok) {
-        const userData = await response.json();
-        setUser(userData);
+        const data = await response.json();
+        setUser(data.user);
       } else {
         setUser(null);
       }
@@ -50,7 +53,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const logout = async () => {
     try {
-      await api.post('/auth/logout');
+      await fetch('/auth/logout', {
+        method: 'POST',
+        credentials: 'include',
+      });
       setUser(null);
     } catch (error) {
       console.error('Logout failed:', error);

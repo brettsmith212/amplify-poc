@@ -177,11 +177,11 @@ describe('LoginPage', () => {
     mockHandleAuthCallback.mockResolvedValueOnce({
       success: true,
       user: {
-        id: 1,
-        login: 'testuser',
-        name: 'Test User',
-        email: 'test@example.com',
-        avatar_url: 'https://github.com/avatar.jpg'
+      id: 1,
+      username: 'testuser',
+      name: 'Test User',
+      email: 'test@example.com',
+      avatarUrl: 'https://github.com/avatar.jpg'
       },
       message: 'Login successful'
     });

@@ -2,10 +2,10 @@ import { api } from '../utils/api';
 
 export interface User {
   id: number;
-  login: string;
+  username: string;
   name: string;
   email: string;
-  avatar_url: string;
+  avatarUrl: string;
 }
 
 export interface AuthResponse {
@@ -51,8 +51,8 @@ class AuthService {
         sessionStorage.setItem('returnUrl', returnUrl);
       }
 
-      // Redirect to GitHub OAuth
-      window.location.href = '/api/auth/github';
+      // Redirect to GitHub OAuth (proxy will forward to backend)
+      window.location.href = '/auth/github';
     } catch (error) {
       console.error('Failed to initiate GitHub login:', error);
       throw new Error('Failed to start login process');

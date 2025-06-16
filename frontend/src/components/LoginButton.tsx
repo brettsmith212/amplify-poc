@@ -28,7 +28,7 @@ const LoginButton: React.FC<LoginButtonProps> = ({
         await onLogin();
       } else {
         // Default behavior: redirect to GitHub OAuth
-        window.location.href = '/api/auth/github';
+        window.location.href = '/auth/github';
       }
     } catch (error) {
       console.error('Login failed:', error);
