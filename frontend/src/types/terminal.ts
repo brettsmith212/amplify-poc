@@ -28,6 +28,7 @@ export interface TerminalHookState {
 
 export interface TerminalProps {
   className?: string;
+  sessionId?: string;
   onReady?: (terminal: import('@xterm/xterm').Terminal) => void;
   onData?: (data: string) => void;
   onResize?: (data: ResizeData) => void;

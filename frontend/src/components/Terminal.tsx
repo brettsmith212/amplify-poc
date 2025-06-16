@@ -6,6 +6,7 @@ import '@xterm/xterm/css/xterm.css';
 
 const Terminal: React.FC<TerminalProps> = ({
   className = '',
+  sessionId,
   onReady,
   onData,
   onResize
@@ -17,9 +18,13 @@ const Terminal: React.FC<TerminalProps> = ({
   const writeRef = useRef<((data: string) => void) | null>(null);
   const writelnRef = useRef<((data: string) => void) | null>(null);
 
-  // WebSocket hook for server communication
+  // WebSocket hook for server communication with optional session support
+  const wsUrl = sessionId 
+    ? `ws://localhost:3000/ws/${sessionId}`
+    : `ws://localhost:3000/ws`;
+  
   const { isConnected, error, sendMessage } = useWebSocket(
-    `ws://localhost:3000/ws`,
+    wsUrl,
     {
       onMessage: useCallback((message: TerminalMessage) => {
         switch (message.type) {
