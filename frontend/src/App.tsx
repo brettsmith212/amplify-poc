@@ -4,21 +4,7 @@ import Layout from './components/Layout';
 import TerminalPage from './pages/TerminalPage';
 import { useAuth } from './hooks/useAuth';
 
-// Placeholder components for routes that will be implemented in later steps
-const LoginPage = () => (
-  <div className="flex-1 flex items-center justify-center">
-    <div className="text-center">
-      <h1 className="text-2xl font-bold text-white mb-4">Welcome to Amplify</h1>
-      <p className="text-gray-400 mb-8">Sign in with GitHub to get started</p>
-      <button
-        onClick={() => window.location.href = '/api/auth/github'}
-        className="bg-gray-800 hover:bg-gray-700 text-white px-6 py-3 rounded-lg transition-colors"
-      >
-        Sign in with GitHub
-      </button>
-    </div>
-  </div>
-);
+import LoginPage from './pages/LoginPage';
 
 const SessionsPage = () => (
   <div className="flex-1 flex items-center justify-center">
