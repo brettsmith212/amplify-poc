@@ -5,6 +5,8 @@ import { DiffViewer } from '../components/DiffViewer';
 import { FileChange } from '../hooks/useDiff';
 
 // Mock Monaco Editor components
+import { vi } from 'vitest';
+
 vi.mock('@monaco-editor/react', () => ({
   Editor: ({ value }: { value: string }) => (
     <div data-testid="monaco-editor">{value}</div>

@@ -1,12 +1,17 @@
-import React from 'react';
+import React, { useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useDiff } from '../hooks/useDiff';
+import { useGit } from '../hooks/useGit';
 import { DiffViewer } from '../components/DiffViewer';
 import { FileTree } from '../components/FileTree';
+import { CommitPanel } from '../components/CommitPanel';
+import { GitActions } from '../components/GitActions';
 
 export const DiffPage: React.FC = () => {
   const { sessionId } = useParams<{ sessionId: string }>();
   const navigate = useNavigate();
+  const [showGitOperations, setShowGitOperations] = useState(false);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   
   const {
     diffData,
@@ -16,6 +21,49 @@ export const DiffPage: React.FC = () => {
     refreshDiff,
     selectFile
   } = useDiff(sessionId || '');
+
+  const {
+    committing,
+    pushing,
+    error: gitError,
+    lastCommitHash,
+    commit,
+    push,
+    clearError: clearGitError
+  } = useGit();
+
+  // Handle git operations
+  const handleCommit = useCallback(async (commitData: any) => {
+    if (!sessionId) return;
+    
+    clearGitError();
+    setSuccessMessage(null);
+    
+    const result = await commit(sessionId, commitData);
+    if (result.success) {
+      setSuccessMessage(`Changes committed successfully${result.commitHash ? ` (${result.commitHash.substring(0, 8)})` : ''}`);
+      // Refresh diff data after commit
+      await refreshDiff();
+    }
+  }, [sessionId, commit, clearGitError, refreshDiff]);
+
+  const handlePush = useCallback(async (pushOptions?: any) => {
+    if (!sessionId) return;
+    
+    clearGitError();
+    setSuccessMessage(null);
+    
+    const result = await push(sessionId, pushOptions);
+    if (result.success) {
+      setSuccessMessage('Changes pushed successfully');
+      if (result.pullRequestUrl) {
+        setSuccessMessage(`Changes pushed successfully. Pull request created: ${result.pullRequestUrl}`);
+      }
+    }
+  }, [sessionId, push, clearGitError]);
+
+  const hasChanges = diffData?.changes && diffData.changes.length > 0;
+  const hasCommits = !!lastCommitHash; // This is a simple check, could be enhanced
 
   if (!sessionId) {
     return (
@@ -127,6 +175,14 @@ export const DiffPage: React.FC = () => {
                 >
                   Refresh
                 </button>
+                {hasChanges && (
+                  <button
+                    onClick={() => setShowGitOperations(!showGitOperations)}
+                    className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 transition-colors"
+                  >
+                    {showGitOperations ? 'Hide Git Operations' : 'Commit & Push'}
+                  </button>
+                )}
                 <button
                   onClick={() => navigate(`/terminal/${sessionId}`)}
                   className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
@@ -143,6 +199,65 @@ export const DiffPage: React.FC = () => {
             </div>
           </div>
         </div>
+
+        {/* Success/Error Messages */}
+        {(successMessage || gitError) && (
+          <div className="mb-6">
+            {successMessage && (
+              <div className="p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+                <div className="flex items-center space-x-2">
+                  <svg className="w-5 h-5 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                  </svg>
+                  <span className="text-sm font-medium text-green-800 dark:text-green-200">{successMessage}</span>
+                  <button
+                    onClick={() => setSuccessMessage(null)}
+                    className="ml-auto text-green-600 hover:text-green-800 dark:text-green-400 dark:hover:text-green-200"
+                  >
+                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            )}
+            {gitError && (
+              <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+                <div className="flex items-center space-x-2">
+                  <svg className="w-5 h-5 text-red-600" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                  </svg>
+                  <span className="text-sm font-medium text-red-800 dark:text-red-200">{gitError}</span>
+                  <button
+                    onClick={clearGitError}
+                    className="ml-auto text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-200"
+                  >
+                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Git Operations Panel */}
+        {showGitOperations && (
+          <div className="mb-6 space-y-4">
+            <CommitPanel
+              onCommit={handleCommit}
+              committing={committing}
+              disabled={!hasChanges}
+            />
+            <GitActions
+              onPush={handlePush}
+              pushing={pushing}
+              hasCommits={hasCommits}
+              disabled={!hasChanges}
+            />
+          </div>
+        )}
 
         {/* Main Content */}
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">

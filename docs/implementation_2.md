@@ -168,7 +168,7 @@
   - **Step Dependencies**: Step 9
   - **User Instructions**: None
 
-- [ ] Step 11: Git Operations UI & Backend
+- [x] Step 11: Git Operations UI & Backend
   - **Task**: Implement commit and push functionality from the diff viewer
   - **Description**: Add UI controls to allow users to commit changes and push to their repositories directly from the diff viewer
   - **Files**:

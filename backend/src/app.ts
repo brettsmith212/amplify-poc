@@ -33,6 +33,7 @@ import { authenticateUser, logAuthEvents } from './middleware/auth';
 import authRoutes from './routes/auth';
 import githubRoutes from './routes/github';
 import sessionRoutes from './routes/sessions';
+import gitRoutes from './routes/git';
 
 const appLogger = logger.child('WebApp');
 
@@ -195,8 +196,8 @@ export class WebApp {
     // Session management routes
     this.app.use('/api/sessions', sessionRoutes);
     
-    // TODO: Add git operation routes
-    // this.app.use('/api/git', gitRoutes);
+    // Git operation routes
+    this.app.use('/api/sessions', gitRoutes);
 
     appLogger.info('Routes configured');
   }
