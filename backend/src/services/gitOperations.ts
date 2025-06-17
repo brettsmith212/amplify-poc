@@ -64,12 +64,14 @@ export class GitOperationsService {
         command: command.join(' ')
       });
 
-      // Execute command in container  
-      // Note: For now, commands run in default working directory
-      // TODO: Enhance executeCommand to support custom working directory
+      // Execute command in container within the repository directory
+      // Extract just the repo name from owner/repo format
+      const repoName = session.repositoryName.split('/').pop() || session.repositoryName;
+      const repositoryPath = `/workspace/${repoName}`;
       const exec = await this.containerManager.executeCommand(
         session.containerId,
-        ['git', ...command]
+        ['git', ...command],
+        repositoryPath
       );
 
       // Start the exec and capture output
@@ -152,8 +154,8 @@ export class GitOperationsService {
    */
   async getDiff(sessionId: string): Promise<GitOperationResult & { diff?: string }> {
     try {
-      // Get diff of all changes (staged + unstaged)
-      const result = await this.executeGitCommand(sessionId, ['diff', 'HEAD']);
+      // Get diff of all changes (staged + unstaged) without color codes
+      const result = await this.executeGitCommand(sessionId, ['diff', '--no-color', 'HEAD']);
       
       if (!result.success) {
         return {

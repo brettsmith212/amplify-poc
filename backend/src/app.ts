@@ -34,6 +34,7 @@ import authRoutes from './routes/auth';
 import githubRoutes from './routes/github';
 import sessionRoutes from './routes/sessions';
 import gitRoutes from './routes/git';
+import diffRoutes from './routes/diff';
 
 const appLogger = logger.child('WebApp');
 
@@ -198,6 +199,9 @@ export class WebApp {
     
     // Git operation routes
     this.app.use('/api/sessions', gitRoutes);
+    
+    // Diff routes for Monaco editor
+    this.app.use('/api/sessions', diffRoutes);
 
     appLogger.info('Routes configured');
   }

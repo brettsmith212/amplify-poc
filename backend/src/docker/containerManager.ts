@@ -290,7 +290,7 @@ export class ContainerManager {
   /**
    * Execute a command in the container
    */
-  async executeCommand(containerId: string, command: string[]): Promise<any> {
+  async executeCommand(containerId: string, command: string[], workingDir?: string): Promise<any> {
     try {
       const container = this.docker.getContainer(containerId);
       
@@ -300,7 +300,8 @@ export class ContainerManager {
         AttachStderr: true,
         AttachStdin: true,
         Tty: true,
-        User: 'amplify'
+        User: 'amplify',
+        ...(workingDir && { WorkingDir: workingDir })
       });
 
       return exec;

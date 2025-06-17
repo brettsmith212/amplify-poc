@@ -1,8 +1,15 @@
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import Terminal from '../components/Terminal';
 
 const TerminalPage = () => {
   const { sessionId } = useParams<{ sessionId: string }>();
+  const navigate = useNavigate();
+
+  const handleViewDiff = () => {
+    if (sessionId) {
+      navigate(`/diff/${sessionId}`);
+    }
+  };
 
   return (
     <div className="flex-1 flex flex-col p-6 max-w-7xl mx-auto w-full">
@@ -22,7 +29,18 @@ const TerminalPage = () => {
               </span>
             )}
           </div>
-          <div className="text-xs text-gray-500">amplify@container:/workspace</div>
+          <div className="flex items-center space-x-3">
+            <div className="text-xs text-gray-500">amplify@container:/workspace</div>
+            <button
+              onClick={handleViewDiff}
+              className="inline-flex items-center px-3 py-1.5 text-sm font-medium text-gray-300 bg-gray-700/50 border border-gray-600 rounded-lg hover:bg-gray-600/50 hover:text-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all duration-200"
+            >
+              <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              View Diff
+            </button>
+          </div>
         </div>
         
         {/* Terminal Content */}

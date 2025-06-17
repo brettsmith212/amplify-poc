@@ -154,17 +154,14 @@
 
 ## Diff Viewer & Git Operations
 
-- [x] Step 10: Monaco Diff Viewer
+- [x] Step 10: Simple Diff Viewer
 
-  - **Task**: Implement Monaco editor for displaying diffs and file changes
-  - **Description**: Create a diff viewer using Monaco editor that shows changes made during coding sessions with syntax highlighting
+  - **Task**: Implement simple git diff viewer with syntax highlighting
+  - **Description**: Create a clean diff viewer that displays git diff output with VSCode-style color coding for additions/deletions
   - **Files**:
-    - `frontend/package.json`: Add Monaco editor dependencies
-    - `frontend/src/pages/DiffPage.tsx`: Diff viewer page
-    - `frontend/src/components/DiffViewer.tsx`: Monaco diff component
-    - `frontend/src/components/FileTree.tsx`: File tree navigation
-    - `frontend/src/hooks/useDiff.ts`: Diff data management hook
-    - `frontend/src/__tests__/DiffViewer.test.tsx`: Diff viewer tests
+    - `frontend/src/pages/DiffPage.tsx`: Diff viewer page with simple approach
+    - `frontend/src/components/SimpleDiffViewer.tsx`: Simple diff component with color highlighting
+    - `backend/src/routes/diff.ts`: Simplified diff endpoint returning raw git diff
   - **Step Dependencies**: Step 9
   - **User Instructions**: None
 
@@ -219,7 +216,7 @@ This implementation plan breaks down the Amplify Phase 2 development into 14 man
 - Multi-session architecture with proper isolation
 - Repository cloning and branch selection
 - Session dashboard and management UI
-- Monaco diff viewer for code changes
+- Simple diff viewer with VSCode-style syntax highlighting
 - Git operations (commit/push) from the web interface
 
 The implementation will result in a complete web-based launcher that meets all acceptance criteria: GitHub OAuth login, session creation with repo/branch selection, real-time terminal access, diff viewing, and comprehensive session management - all while building efficiently on the robust Phase 1 foundation.
