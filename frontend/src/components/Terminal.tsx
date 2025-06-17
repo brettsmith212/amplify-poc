@@ -19,7 +19,6 @@ const Terminal: React.FC<TerminalProps> = ({
   const writelnRef = useRef<((data: string) => void) | null>(null);
 
   // WebSocket hook for server communication with optional session support
-  // TEMPORARY: Connect directly to backend for debugging
   const wsUrl = sessionId 
     ? `ws://localhost:3000/ws/${sessionId}`
     : `ws://localhost:3000/ws`;
