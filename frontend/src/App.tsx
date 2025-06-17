@@ -7,6 +7,7 @@ import { useAuth } from './hooks/useAuth';
 import LoginPage from './pages/LoginPage';
 import CreateSessionPage from './pages/CreateSessionPage';
 import SessionsPage from './pages/SessionsPage';
+import DiffPage from './pages/DiffPage';
 
 
 
@@ -76,6 +77,14 @@ const AppContent = () => {
             element={
               <ProtectedRoute>
                 <TerminalPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/diff/:sessionId"
+            element={
+              <ProtectedRoute>
+                <DiffPage />
               </ProtectedRoute>
             }
           />
