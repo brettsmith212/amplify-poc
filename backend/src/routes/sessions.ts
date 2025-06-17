@@ -77,21 +77,13 @@ router.get('/', async (req: Request, res: Response): Promise<void> => {
 router.post('/', async (req: Request, res: Response): Promise<void> => {
   try {
     const user = getAuthenticatedUser(req)!;
-    const { repositoryUrl, branch, prompt, sessionName } = req.body;
+    const { repositoryUrl, branch, sessionName } = req.body;
 
     // Validate required fields
     if (!repositoryUrl) {
       res.status(400).json({
         error: 'Invalid request',
         message: 'Repository URL is required'
-      });
-      return;
-    }
-
-    if (!prompt) {
-      res.status(400).json({
-        error: 'Invalid request',
-        message: 'Prompt is required'
       });
       return;
     }
@@ -107,7 +99,6 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
     const sessionData = {
       repositoryUrl,
       branch: branch || 'main',
-      prompt,
       sessionName: sessionName || 'Untitled Session'
     };
 

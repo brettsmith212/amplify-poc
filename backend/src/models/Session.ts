@@ -8,7 +8,6 @@ export interface Session {
   repositoryUrl: string;
   repositoryName: string;
   branch: string;
-  initialPrompt: string;
   status: SessionStatus;
   containerId?: string;
   containerName?: string;
@@ -40,7 +39,6 @@ export interface SessionMetadata {
 export interface CreateSessionRequest {
   repositoryUrl: string;
   branch: string;
-  initialPrompt: string;
   tags?: string[];
 }
 

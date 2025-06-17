@@ -12,7 +12,7 @@ echo -e "${BLUE}🚀 Amplify Container Starting${NC}"
 echo "================================="
 
 # Check if this is a session with repository
-if [ -n "$REPOSITORY_URL" ] && [ -n "$SESSION_PROMPT" ]; then
+if [ -n "$REPOSITORY_URL" ]; then
     echo -e "${YELLOW}📦 Session Details:${NC}"
     echo "Repository: $REPOSITORY_URL"
     echo "Branch: ${REPOSITORY_BRANCH:-main}"
@@ -39,39 +39,13 @@ if [ -n "$REPOSITORY_URL" ] && [ -n "$SESSION_PROMPT" ]; then
         echo "Latest commit: $(git log -1 --pretty=format:'%h - %s (%an, %ar)')"
         echo ""
         
-        # Create prompt file for reference
-        echo "$SESSION_PROMPT" > .amplify-prompt.txt
-        echo -e "${BLUE}📝 Prompt saved to .amplify-prompt.txt${NC}"
-        echo ""
-        
-        # Show the prompt
-        echo -e "${YELLOW}🎯 Session Prompt:${NC}"
-        echo "\"$SESSION_PROMPT\""
-        echo ""
-        
-        # Auto-start amp with the prompt
-        echo -e "${GREEN}🤖 Starting Amplify with your prompt...${NC}"
-        echo "================================="
-        echo ""
-        
-        # Run amp with the prompt
-        if echo "$SESSION_PROMPT" | amp; then
-            echo ""
-            echo -e "${GREEN}✨ Amplify session completed!${NC}"
-        else
-            echo ""
-            echo -e "${RED}⚠️  Amplify session ended with errors${NC}"
-        fi
-        
-        echo ""
         echo -e "${BLUE}🛠️  You're now in an interactive shell in your repository.${NC}"
-        echo -e "${BLUE}   You can continue working, run more amp commands, or explore your code.${NC}"
+        echo -e "${BLUE}   You can run amp commands, explore your code, or make changes.${NC}"
         echo ""
         echo -e "${YELLOW}Useful commands:${NC}"
-        echo "  amp \"new prompt\"     - Run amp with a new prompt"
-        echo "  amp < .amplify-prompt.txt - Re-run the original prompt"
-        echo "  git status            - Check git status"
-        echo "  ls -la               - List files"
+        echo "  amp \"your prompt\"   - Run amp with a prompt"
+        echo "  git status           - Check git status"
+        echo "  ls -la              - List files"
         echo ""
         
     else

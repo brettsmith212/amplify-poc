@@ -15,13 +15,11 @@ const sessionControllerLogger = logger.child('SessionController');
 export interface SessionData {
   repositoryUrl: string;
   branch: string;
-  prompt: string;
   sessionName: string;
 }
 
 export interface SessionUpdateData {
   sessionName?: string;
-  prompt?: string;
 }
 
 export interface SessionResult<T = any> {
@@ -167,7 +165,6 @@ export async function createSession(
       repositoryUrl: sessionData.repositoryUrl,
       repositoryName: `${owner}/${repoName}`,
       branch: sessionData.branch,
-      initialPrompt: sessionData.prompt,
       status: SessionStatus.READY,
 
       createdAt: new Date(),
@@ -290,9 +287,7 @@ export async function updateSession(
       };
     }
     
-    if (updateData.prompt !== undefined) {
-      updates.initialPrompt = updateData.prompt;
-    }
+
 
     if (Object.keys(updates).length === 0) {
       return {
@@ -477,7 +472,6 @@ export async function startSession(userId: string, sessionId: string): Promise<S
         USER_ID: userId,
         REPOSITORY_URL: session.repositoryUrl,
         REPOSITORY_BRANCH: session.branch,
-        SESSION_PROMPT: session.initialPrompt,
         // Pass AMP_API_KEY if available
         ...(process.env.AMP_API_KEY && { AMP_API_KEY: process.env.AMP_API_KEY })
       },

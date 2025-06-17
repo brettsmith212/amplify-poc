@@ -28,10 +28,12 @@ clean:
 	rm -rf backend/dist
 	@echo "✅ Clean complete"
 
-# Development mode (start backend dev server)
+# Development mode (start backend and frontend dev servers)
 dev:
-	@echo "🚀 Starting development server..."
-	cd backend && npm run dev
+	@echo "🚀 Starting development servers..."
+	@echo "Backend: http://localhost:3000"
+	@echo "Frontend: http://localhost:5173"
+	cd backend && npm run dev:web & cd frontend && npm run dev & wait
 
 # Install dependencies for both frontend and backend
 deps:

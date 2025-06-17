@@ -85,8 +85,7 @@ export class ContainerManager {
           'amplify.created': new Date().toISOString(),
           'amplify.version': '0.1.0'
         },
-        // Keep container running
-        Cmd: ['bash'],
+        // Keep container running - let entrypoint handle this
         Tty: true,
         OpenStdin: true,
         StdinOnce: false,

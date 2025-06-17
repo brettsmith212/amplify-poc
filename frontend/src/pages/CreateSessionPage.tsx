@@ -3,21 +3,18 @@ import { useNavigate } from 'react-router-dom';
 import { Repository } from '../hooks/useGitHub';
 import { RepoSelector } from '../components/RepoSelector';
 import { BranchSelector } from '../components/BranchSelector';
-import { PromptEditor } from '../components/PromptEditor';
 import { api } from '../utils/api';
 
 interface SessionData {
   sessionName: string;
   repository: Repository | null;
   branch: string;
-  prompt: string;
 }
 
 interface ValidationErrors {
   sessionName?: string;
   repository?: string;
   branch?: string;
-  prompt?: string;
 }
 
 export const CreateSessionPage: React.FC = () => {
@@ -26,7 +23,6 @@ export const CreateSessionPage: React.FC = () => {
     sessionName: '',
     repository: null,
     branch: '',
-    prompt: '',
   });
   const [errors, setErrors] = useState<ValidationErrors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -50,14 +46,6 @@ export const CreateSessionPage: React.FC = () => {
 
     if (!formData.branch.trim()) {
       newErrors.branch = 'Please select a branch';
-    }
-
-    if (!formData.prompt.trim()) {
-      newErrors.prompt = 'Please provide a prompt describing what you want to work on';
-    } else if (formData.prompt.length < 10) {
-      newErrors.prompt = 'Prompt should be at least 10 characters';
-    } else if (formData.prompt.length > 2000) {
-      newErrors.prompt = 'Prompt is too long (max 2000 characters)';
     }
 
     return newErrors;
@@ -92,7 +80,6 @@ export const CreateSessionPage: React.FC = () => {
         sessionName: formData.sessionName,
         repositoryUrl: formData.repository!.cloneUrl, // Use HTTPS clone URL
         branch: formData.branch,
-        prompt: formData.prompt,
       });
 
       if (response.success && response.data) {
@@ -141,7 +128,7 @@ export const CreateSessionPage: React.FC = () => {
             Create New Session
           </h1>
           <p className="text-base text-gray-600 dark:text-gray-300 max-w-2xl mx-auto">
-            Set up a new coding session with your GitHub repository and start building something amazing
+            Set up a new coding session with your GitHub repository
           </p>
         </div>
 
@@ -296,25 +283,7 @@ export const CreateSessionPage: React.FC = () => {
           )}
         </div>
 
-        {/* Prompt Editor */}
-        <div className="space-y-2">
-          <p className="text-xs text-gray-600 dark:text-gray-400">
-            Describe what you'd like to work on during this session
-          </p>
-          <PromptEditor
-            value={formData.prompt}
-            onChange={handleInputChange('prompt')}
-            disabled={isSubmitting}
-          />
-          {errors.prompt && (
-            <div className="flex items-center space-x-2 mt-2">
-              <svg className="w-4 h-4 text-red-500" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-              </svg>
-              <p className="text-sm text-red-600">{errors.prompt}</p>
-            </div>
-          )}
-        </div>
+
 
         {/* Submit Error */}
         {submitError && (
@@ -392,25 +361,25 @@ export const CreateSessionPage: React.FC = () => {
                   <svg className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                   </svg>
-                  <span className="text-sm text-blue-800 dark:text-blue-200">Be specific about what you want to accomplish</span>
+                  <span className="text-sm text-blue-800 dark:text-blue-200">Choose the repository you want to work on</span>
                 </div>
                 <div className="flex items-start space-x-2">
                   <svg className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                   </svg>
-                  <span className="text-sm text-blue-800 dark:text-blue-200">Mention the files or areas of code you want to work on</span>
+                  <span className="text-sm text-blue-800 dark:text-blue-200">Select the branch you want to work on</span>
                 </div>
                 <div className="flex items-start space-x-2">
                   <svg className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                   </svg>
-                  <span className="text-sm text-blue-800 dark:text-blue-200">Include any relevant context or constraints</span>
+                  <span className="text-sm text-blue-800 dark:text-blue-200">The repository will be automatically cloned</span>
                 </div>
                 <div className="flex items-start space-x-2">
                   <svg className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                   </svg>
-                  <span className="text-sm text-blue-800 dark:text-blue-200">Use the branch that contains the code you want to modify</span>
+                  <span className="text-sm text-blue-800 dark:text-blue-200">Access your code through the terminal session</span>
                 </div>
               </div>
             </div>

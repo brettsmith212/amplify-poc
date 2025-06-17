@@ -139,12 +139,7 @@ export const SessionCard: React.FC<SessionCardProps> = ({
           </div>
         </div>
 
-        {/* Prompt Preview */}
-        <div className="mb-4">
-          <p className="text-sm text-gray-700 dark:text-gray-300 line-clamp-2">
-            {session.initialPrompt}
-          </p>
-        </div>
+
 
         {/* Metadata */}
         <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400 mb-4">

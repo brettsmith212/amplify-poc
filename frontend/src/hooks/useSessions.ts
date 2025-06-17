@@ -7,7 +7,6 @@ export interface Session {
   repositoryUrl: string;
   repositoryName: string;
   branch: string;
-  initialPrompt: string;
   status: SessionStatus;
   containerId?: string;
   containerName?: string;
@@ -59,7 +58,6 @@ export interface UseSessionsReturn {
   createSession: (data: {
     repositoryUrl: string;
     branch: string;
-    initialPrompt: string;
     sessionName?: string;
   }) => Promise<Session | null>;
 }
@@ -182,7 +180,6 @@ export const useSessions = (): UseSessionsReturn => {
   const createSession = useCallback(async (data: {
     repositoryUrl: string;
     branch: string;
-    initialPrompt: string;
     sessionName?: string;
   }): Promise<Session | null> => {
     try {
