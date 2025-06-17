@@ -14,6 +14,8 @@ import webConfig, { validateConfig } from './config/webConfig';
 import { sessionStore } from './services/sessionStore';
 import { CleanupService } from './services/cleanup';
 import { ContainerManager } from './docker/containerManager';
+import { DockerExecManager } from './docker/execManager';
+import { TerminalBridge } from './websocket/terminalBridge';
 import { logger } from './utils/logger';
 
 import {
@@ -44,6 +46,7 @@ export class WebApp {
   private app: express.Application;
   private server?: any;
   private wss?: WebSocketServer;
+  private terminalBridge?: TerminalBridge;
   private containerManager: ContainerManager;
   private cleanupService: CleanupService;
   private options: WebAppOptions;
@@ -206,25 +209,67 @@ export class WebApp {
       return;
     }
 
+    // Create WebSocket server (no path restriction to handle /ws/:sessionId)
     this.wss = new WebSocketServer({
-      server: this.server,
-      path: '/ws'
+      server: this.server
     });
 
-    // TODO: Implement multi-session WebSocket handling
-    this.wss.on('connection', (ws, request) => {
-      appLogger.info('WebSocket connection established', {
-        clientIp: request.socket.remoteAddress,
-        userAgent: request.headers['user-agent']
-      });
+    // Create default Docker exec manager for fallback
+    const Docker = require('dockerode');
+    const docker = new Docker();
+    const defaultExecManager = new DockerExecManager(docker, 'default-container');
 
-      // TODO: Handle session-specific terminal connections
-      ws.on('close', () => {
-        appLogger.debug('WebSocket connection closed');
-      });
+    // Initialize terminal bridge
+    this.terminalBridge = new TerminalBridge(defaultExecManager);
+
+    this.wss.on('connection', async (ws, request) => {
+      try {
+        // Only handle WebSocket connections for /ws paths
+        const url = request.url || '';
+        if (!url.startsWith('/ws')) {
+          appLogger.warn('WebSocket connection attempted on non-/ws path', { url });
+          ws.close();
+          return;
+        }
+
+        // Extract session ID from URL path: /ws/:sessionId
+        const sessionIdMatch = url.match(/^\/ws\/([^/?]+)/);
+        const sessionId = sessionIdMatch ? sessionIdMatch[1] : undefined;
+
+        const clientInfo = {
+          ...(request.socket.remoteAddress && { remoteAddress: request.socket.remoteAddress }),
+          ...(request.headers['user-agent'] && { userAgent: request.headers['user-agent'] })
+        };
+
+        const actualSessionId = await this.terminalBridge!.handleConnection(
+          ws, 
+          sessionId, 
+          clientInfo
+        );
+        
+        appLogger.info(`WebSocket terminal connection established: ${actualSessionId}`, {
+          requestedSessionId: sessionId,
+          clientIp: request.socket.remoteAddress,
+          userAgent: request.headers['user-agent']
+        });
+      } catch (error) {
+        appLogger.error('Failed to handle WebSocket connection:', error);
+        ws.close();
+      }
     });
 
-    appLogger.info('WebSocket server configured');
+    // Set up periodic ping to keep connections alive
+    const pingInterval = setInterval(() => {
+      if (this.terminalBridge) {
+        this.terminalBridge.pingAllSessions();
+      }
+    }, 30000); // Ping every 30 seconds
+
+    this.wss.on('close', () => {
+      clearInterval(pingInterval);
+    });
+
+    appLogger.info('WebSocket server configured with terminal bridge');
   }
 
   /**

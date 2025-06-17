@@ -77,6 +77,43 @@ export class TerminalBridge {
     
     logger.info(`New WebSocket connection for terminal session: ${terminalSessionId}`);
 
+    let execManager = this.execManager;
+    let welcomeMessage = '\r\n\x1b[32m● Terminal connected to Docker container\x1b[0m\r\n';
+
+    // If a session ID is provided, try to connect to the existing session's container
+    if (sessionId) {
+      try {
+        // Import sessionStore here to avoid circular dependency
+        const { sessionStore } = await import('../services/sessionStore');
+        const sessionData = sessionStore.getSession(sessionId);
+        
+        if (sessionData && sessionData.containerId) {
+          // Create a new exec manager for this specific container
+          const Docker = require('dockerode');
+          const docker = new Docker();
+          const { DockerExecManager } = await import('../docker/execManager');
+          
+          execManager = new DockerExecManager(docker, sessionData.containerId);
+          welcomeMessage = `\r\n\x1b[32m● Connected to session ${sessionId} (${sessionData.repositoryName})\x1b[0m\r\n`;
+          
+          logger.info(`Connected to existing session container`, {
+            sessionId,
+            containerId: sessionData.containerId,
+            repository: sessionData.repositoryName
+          });
+        } else {
+          logger.warn(`Session ${sessionId} not found or no container`, {
+            sessionFound: !!sessionData,
+            containerId: sessionData?.containerId
+          });
+          welcomeMessage = `\r\n\x1b[33m● Session ${sessionId} not found or not started. Using default container.\x1b[0m\r\n`;
+        }
+      } catch (error) {
+        logger.error(`Failed to connect to session ${sessionId}:`, error);
+        welcomeMessage = `\r\n\x1b[31m● Failed to connect to session ${sessionId}. Using default container.\x1b[0m\r\n`;
+      }
+    }
+
     // Create session in session manager
     const sessionInfo = this.sessionManager.createSession(clientInfo);
     const messageHandler = new WebSocketMessageHandler();
@@ -84,7 +121,7 @@ export class TerminalBridge {
     const session: TerminalSession = {
       id: terminalSessionId,
       websocket,
-      execManager: this.execManager,
+      execManager,
       messageHandler,
       isActive: true,
       sessionInfo
@@ -95,9 +132,7 @@ export class TerminalBridge {
     this.setupMessageHandlers(session);
 
     // Send welcome message
-    this.sendMessage(session, messageHandler.createOutputMessage(
-      '\r\n\x1b[32m● Terminal connected to Docker container\x1b[0m\r\n'
-    ));
+    this.sendMessage(session, messageHandler.createOutputMessage(welcomeMessage));
 
     // Start shell session
     await this.startShellSession(session);
@@ -172,18 +207,21 @@ export class TerminalBridge {
       const shellSessionId = generateSessionId();
       session.shellSessionId = shellSessionId;
 
+      // Use /workspace as working directory - the entrypoint script handles repo cloning
+      const workingDir = '/workspace';
+
       // Create shell exec session
-      const execSession = await this.execManager.createExecSession(shellSessionId, {
+      const execSession = await session.execManager.createExecSession(shellSessionId, {
         cmd: ['/bin/bash', '-l'],
         tty: true,
         attachStdin: true,
         attachStdout: true,
         attachStderr: true,
-        workingDir: '/workspace'
+        workingDir
       });
 
       // Set up exec session event handlers
-      this.execManager.on('output', (execSessionId: string, data: Buffer) => {
+      session.execManager.on('output', (execSessionId: string, data: Buffer) => {
         if (execSessionId === shellSessionId) {
           const output = data.toString();
           logger.debug(`Shell output for ${execSessionId}:`, { output: JSON.stringify(output) });
@@ -191,7 +229,7 @@ export class TerminalBridge {
         }
       });
 
-      this.execManager.on('error', (execSessionId: string, error: Error) => {
+      session.execManager.on('error', (execSessionId: string, error: Error) => {
         if (execSessionId === shellSessionId) {
           logger.error(`Exec session error for ${execSessionId}:`, error);
           this.sendMessage(session, session.messageHandler.createOutputMessage(
@@ -200,7 +238,7 @@ export class TerminalBridge {
         }
       });
 
-      this.execManager.on('end', (execSessionId: string) => {
+      session.execManager.on('end', (execSessionId: string) => {
         if (execSessionId === shellSessionId) {
           logger.info(`Shell session ${execSessionId} ended`);
           this.sendMessage(session, session.messageHandler.createOutputMessage(
@@ -211,11 +249,11 @@ export class TerminalBridge {
       });
 
       // Start the exec session
-      await this.execManager.startExecSession(shellSessionId);
+      await session.execManager.startExecSession(shellSessionId);
       
       // Send initial newline to trigger shell prompt
       setTimeout(async () => {
-        await this.execManager.writeToSession(shellSessionId, '\r');
+        await session.execManager.writeToSession(shellSessionId, '\r');
       }, 100);
       
       // Update session manager with shell info
@@ -237,7 +275,7 @@ export class TerminalBridge {
     }
 
     try {
-      const success = await this.execManager.writeToSession(session.shellSessionId, input);
+      const success = await session.execManager.writeToSession(session.shellSessionId, input);
       if (!success) {
         logger.warn(`Failed to write input to shell session ${session.shellSessionId}`);
       }
@@ -253,7 +291,7 @@ export class TerminalBridge {
     }
 
     try {
-      await this.execManager.resizeSession(session.shellSessionId, resizeData.cols, resizeData.rows);
+      await session.execManager.resizeSession(session.shellSessionId, resizeData.cols, resizeData.rows);
       logger.debug(`Resized terminal ${session.id} to ${resizeData.cols}x${resizeData.rows}`);
     } catch (error) {
       logger.error(`Error resizing terminal ${session.id}:`, error);
@@ -267,7 +305,7 @@ export class TerminalBridge {
     }
 
     try {
-      await this.execManager.killSession(session.shellSessionId, controlData.signal);
+      await session.execManager.killSession(session.shellSessionId, controlData.signal);
       logger.info(`Sent ${controlData.signal} to shell session ${session.shellSessionId}`);
     } catch (error) {
       logger.error(`Error sending signal to shell session ${session.shellSessionId}:`, error);

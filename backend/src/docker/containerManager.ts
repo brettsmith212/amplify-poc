@@ -60,7 +60,6 @@ export class ContainerManager {
         WorkingDir: '/workspace',
         User: 'amplify',
         HostConfig: {
-          // No special mounts needed - regular container filesystem is ephemeral and writable
           // Expose ports for potential web server and SSH
           PortBindings: {
             '22/tcp': [{ HostPort: '' }], // Dynamic port assignment

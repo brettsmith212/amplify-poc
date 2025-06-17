@@ -142,7 +142,7 @@
 
   - Phase 1 already has xterm.js terminal component with WebSocket connection
 
-- [ ] Step 9: Multi-Session Terminal Support
+- [x] Step 9: Multi-Session Terminal Support
   - **Task**: Enhance existing terminal component to support session-specific connections
   - **Description**: Modify the existing terminal component to connect to specific session containers and handle session-specific WebSocket connections
   - **Files**:
@@ -194,33 +194,6 @@
     - `backend/src/middleware/validation.ts`: Request validation middleware
     - `frontend/src/__tests__/ErrorHandling.test.tsx`: Error handling tests
   - **Step Dependencies**: Step 11
-  - **User Instructions**: None
-
-- [ ] Step 13: End-to-End Testing
-
-  - **Task**: Implement comprehensive end-to-end tests covering the complete user workflow
-  - **Description**: Create E2E tests that validate the entire user journey from login to session completion
-  - **Files**:
-    - `package.json`: Add Playwright to root package.json
-    - `e2e/login.spec.ts`: Login flow E2E tests
-    - `e2e/session-creation.spec.ts`: Session creation E2E tests
-    - `e2e/terminal.spec.ts`: Terminal interaction E2E tests
-    - `e2e/diff-commit.spec.ts`: Diff viewing and commit E2E tests
-    - `playwright.config.ts`: Playwright configuration
-  - **Step Dependencies**: Step 12
-  - **User Instructions**: Install Playwright browsers with `npx playwright install`
-
-- [ ] Step 14: Documentation & Setup Scripts
-  - **Task**: Create comprehensive documentation and setup scripts for easy deployment
-  - **Description**: Document the complete setup process, API endpoints, and create automated setup scripts
-  - **Files**:
-    - `README.md`: Update with Phase 2 setup and usage documentation
-    - `docs/API.md`: API endpoint documentation
-    - `docs/DEPLOYMENT.md`: Deployment instructions
-    - `scripts/setup.sh`: Automated setup script
-    - `scripts/dev.sh`: Development environment startup script
-    - `docker-compose.yml`: Complete development environment
-  - **Step Dependencies**: Step 13
   - **User Instructions**: None
 
 ## Summary

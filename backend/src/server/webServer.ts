@@ -240,10 +240,9 @@ export class WebServer {
       throw new Error('HTTP server not initialized');
     }
 
-    // Create WebSocket server
+    // Create WebSocket server (no path restriction to handle /ws/:sessionId)
     this.wss = new WebSocketServer({
-      server: this.server,
-      path: '/ws'
+      server: this.server
     });
 
     // Initialize terminal bridge if exec manager is available
@@ -252,8 +251,31 @@ export class WebServer {
 
       this.wss.on('connection', async (ws, request) => {
         try {
-          const sessionId = await this.terminalBridge!.handleConnection(ws);
-          serverLogger.info(`WebSocket terminal connection established: ${sessionId}`, {
+          // Only handle WebSocket connections for /ws paths
+          const url = request.url || '';
+          if (!url.startsWith('/ws')) {
+            serverLogger.warn('WebSocket connection attempted on non-/ws path', { url });
+            ws.close();
+            return;
+          }
+
+          // Extract session ID from URL path: /ws/:sessionId
+          const sessionIdMatch = url.match(/^\/ws\/([^/?]+)/);
+          const sessionId = sessionIdMatch ? sessionIdMatch[1] : undefined;
+
+          const clientInfo = {
+            ...(request.socket.remoteAddress && { remoteAddress: request.socket.remoteAddress }),
+            ...(request.headers['user-agent'] && { userAgent: request.headers['user-agent'] })
+          };
+
+          const actualSessionId = await this.terminalBridge!.handleConnection(
+            ws, 
+            sessionId, 
+            clientInfo
+          );
+          
+          serverLogger.info(`WebSocket terminal connection established: ${actualSessionId}`, {
+            requestedSessionId: sessionId,
             clientIp: request.socket.remoteAddress,
             userAgent: request.headers['user-agent']
           });

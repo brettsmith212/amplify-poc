@@ -7,7 +7,7 @@ import { Session, SessionStatus } from '../models/Session';
 import { sessionStore } from '../services/sessionStore';
 import { ContainerManager } from '../docker/containerManager';
 import { createGitHubApiService } from '../services/githubApi';
-import { cloneRepository } from '../services/gitClone';
+
 import { logger } from '../utils/logger';
 
 const sessionControllerLogger = logger.child('SessionController');
@@ -461,49 +461,25 @@ export async function startSession(userId: string, sessionId: string): Promise<S
       }
     }
 
-    // Clone repository if not already cloned
-    const workingDirectory = `/workspace/${sessionId}`;
-    if (!session.metadata.gitCommitHash) {
-      sessionControllerLogger.info('Cloning repository for session', {
-        userId,
-        sessionId,
-        repositoryUrl: session.repositoryUrl,
-        branch: session.branch
-      });
+    // Create and start container (repository cloning happens inside container via entrypoint)
+    sessionControllerLogger.info('Creating container for session', {
+      userId,
+      sessionId,
+      repositoryUrl: session.repositoryUrl,
+      branch: session.branch
+    });
 
-      const cloneResult = await cloneRepository(
-        session.repositoryUrl,
-        session.branch,
-        workingDirectory
-      );
-
-      if (!cloneResult.success) {
-        return {
-          success: false,
-          error: `Failed to clone repository: ${cloneResult.error}`
-        };
-      }
-
-      // Update session with clone info (use metadata to track this)
-      sessionStore.updateSession(sessionId, {
-        metadata: {
-          ...session.metadata,
-          gitCommitHash: 'cloned',
-          tags: session.metadata.tags || []
-        }
-      });
-    }
-
-    // Create and start container
     const containerResult = await containerManager.createContainer({
       sessionId,
-      workspaceDir: workingDirectory,
+      workspaceDir: `/workspace/${sessionId}`, // Not used since no volume mount, but keep for compatibility
       environment: {
         SESSION_ID: sessionId,
         USER_ID: userId,
         REPOSITORY_URL: session.repositoryUrl,
         REPOSITORY_BRANCH: session.branch,
-        SESSION_PROMPT: session.initialPrompt
+        SESSION_PROMPT: session.initialPrompt,
+        // Pass AMP_API_KEY if available
+        ...(process.env.AMP_API_KEY && { AMP_API_KEY: process.env.AMP_API_KEY })
       },
       baseImage: 'amplify-base'
     });
@@ -512,6 +488,15 @@ export async function startSession(userId: string, sessionId: string): Promise<S
       return {
         success: false,
         error: `Failed to create container: ${containerResult.error}`
+      };
+    }
+
+    // Start the container
+    const startResult = await containerManager.startContainer(containerResult.container.id);
+    if (!startResult.success) {
+      return {
+        success: false,
+        error: `Failed to start container: ${startResult.error}`
       };
     }
 
@@ -536,7 +521,7 @@ export async function startSession(userId: string, sessionId: string): Promise<S
         sessionId,
         containerId: containerResult.container.id,
         status: 'running',
-        workingDirectory
+        workingDirectory: `/workspace/${sessionId}`
       }
     };
 
