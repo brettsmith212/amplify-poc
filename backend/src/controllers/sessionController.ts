@@ -185,9 +185,29 @@ export async function createSession(
       branch: sessionData.branch
     });
 
+    // Automatically start the session so it's ready for immediate use
+    sessionControllerLogger.info('Auto-starting session for immediate use', { sessionId });
+    const startResult = await startSession(user.id, sessionId);
+    
+    if (!startResult.success) {
+      sessionControllerLogger.warn('Failed to auto-start session, but session creation succeeded', {
+        sessionId,
+        startError: startResult.error
+      });
+      // Don't fail the whole creation - user can manually start later if needed
+    } else {
+      sessionControllerLogger.info('Session created and started successfully', {
+        sessionId,
+        containerId: startResult.data?.containerId
+      });
+    }
+
+    // Return the updated session with container info if start succeeded
+    const updatedSession = sessionStore.getSession(sessionId) || session;
+
     return {
       success: true,
-      data: session
+      data: updatedSession
     };
 
   } catch (error: any) {
