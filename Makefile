@@ -23,11 +23,20 @@ dev:
 	@echo "🚀 Starting development servers..."
 	@echo "Backend: http://localhost:3000"
 	@echo "Frontend: http://localhost:5173"
-	@trap 'kill $$(jobs -p) 2>/dev/null; exit' INT TERM; \
+	@echo "Press Ctrl+C to stop all servers"
+	@set -m; \
+	trap 'echo "🛑 Stopping development servers..."; \
+		kill -TERM $$(jobs -p) 2>/dev/null || true; \
+		pkill -f "npm run dev" 2>/dev/null || true; \
+		sleep 2; \
+		kill -KILL $$(jobs -p) 2>/dev/null || true; \
+		echo "✅ All servers stopped"; \
+		exit 0' INT TERM; \
 	cd backend && npm run dev & \
 	BACKEND_PID=$$!; \
 	cd frontend && npm run dev & \
 	FRONTEND_PID=$$!; \
+	echo "🎯 Development servers started (PIDs: Backend=$$BACKEND_PID, Frontend=$$FRONTEND_PID)"; \
 	wait $$BACKEND_PID $$FRONTEND_PID
 
 # Install dependencies for both frontend and backend
