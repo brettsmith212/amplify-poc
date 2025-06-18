@@ -2,7 +2,7 @@
 
 ## Core Backend Infrastructure
 
-- [ ] Step 1: Create Thread Bootstrap Foundation
+- [x] Step 1: Create Thread Bootstrap Foundation
 
   - **Task**: Implement thread ID generation and persistence when creating sessions, and integrate `amp threads new` command execution in session creation flow
   - **Description**: This establishes the core thread tracking mechanism that all subsequent features depend on. The PRD specifies that thread bootstrap should store thread.id and amp.log path during session creation.
@@ -10,11 +10,10 @@
     - `backend/src/controllers/sessionController.ts`: Add thread ID generation and amp.log path creation
     - `backend/src/models/Session.ts`: Add threadId and ampLogPath fields to Session model
     - `backend/src/services/ampService.ts`: Create new service to handle amp command execution
-    - `backend/src/__tests__/controllers/sessionController.test.ts`: Add tests for thread bootstrap
   - **Step Dependencies**: None
   - **User Instructions**: This step modifies session creation to include thread bootstrapping. Test by creating a new session and verifying thread.id is generated and stored.
 
-- [ ] Step 2: Implement AmpLogParser Service
+- [x] Step 2: Implement AmpLogParser Service
 
   - **Task**: Create the AmpLogParser service based on the parsing documentation to parse JSONL amp.log files and convert them to ThreadMessage objects
   - **Description**: This is the core parsing engine that converts amp's structured logs into UI-consumable messages. It handles deduplication, message routing, and state management as specified in the parsing docs.
@@ -22,7 +21,6 @@
     - `backend/src/services/ampLogParser.ts`: Complete AmpLogParser implementation from docs
     - `backend/src/types/threadMessage.ts`: Define ThreadMessage and related interfaces
     - `backend/src/utils/logParsingUtils.ts`: Utility functions for log parsing and message ID generation
-    - `backend/src/__tests__/services/ampLogParser.test.ts`: Complete test suite for parser
   - **Step Dependencies**: Step 1
   - **User Instructions**: This creates the parsing engine. Test by providing sample amp.log files and verifying correct ThreadMessage output.
 
@@ -32,7 +30,6 @@
   - **Files**:
     - `backend/src/services/logTailer.ts`: Implement file watching and streaming logic
     - `backend/src/services/logTailerWithParser.ts`: Combine LogTailer with AmpLogParser
-    - `backend/src/__tests__/services/logTailer.test.ts`: Test file watching and streaming
   - **Step Dependencies**: Step 2
   - **User Instructions**: This enables real-time log parsing. Test by appending to an amp.log file and verifying events are generated.
 

@@ -9,6 +9,7 @@ import { ContainerManager } from '../docker/containerManager';
 import { createGitHubApiService } from '../services/githubApi';
 
 import { logger } from '../utils/logger';
+import { ampService } from '../services/ampService';
 
 const sessionControllerLogger = logger.child('SessionController');
 
@@ -156,9 +157,37 @@ export async function createSession(
       };
     }
 
-    // Step 4: Create session
+    // Step 4: Create amp thread
+    sessionControllerLogger.info('Creating amp thread for session', {
+      userId: user.id,
+      repositoryUrl: sessionData.repositoryUrl,
+      branch: sessionData.branch
+    });
+
     const sessionId = `session-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     
+    const threadResult = await ampService.createThread(sessionId, {
+      environment: {
+        REPOSITORY_URL: sessionData.repositoryUrl,
+        REPOSITORY_BRANCH: sessionData.branch,
+        USER_ID: user.id
+      }
+    });
+
+    if (!threadResult.success) {
+      sessionControllerLogger.error('Failed to create amp thread', {
+        userId: user.id,
+        sessionId,
+        error: threadResult.error
+      });
+
+      return {
+        success: false,
+        error: `Failed to create thread: ${threadResult.error}`
+      };
+    }
+
+    // Step 5: Create session with thread data
     const session: Session = {
       id: sessionId,
       userId: user.id,
@@ -166,7 +195,8 @@ export async function createSession(
       repositoryName: `${owner}/${repoName}`,
       branch: sessionData.branch,
       status: SessionStatus.READY,
-
+      threadId: threadResult.threadId!,
+      ampLogPath: threadResult.ampLogPath!,
       createdAt: new Date(),
       lastAccessedAt: new Date(),
       expiresAt: new Date(Date.now() + 14400000), // 4 hours default TTL
@@ -182,7 +212,9 @@ export async function createSession(
       userId: user.id,
       sessionId,
       repositoryUrl: sessionData.repositoryUrl,
-      branch: sessionData.branch
+      branch: sessionData.branch,
+      threadId: threadResult.threadId,
+      ampLogPath: threadResult.ampLogPath
     });
 
     // Automatically start the session so it's ready for immediate use

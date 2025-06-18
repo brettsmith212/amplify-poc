@@ -11,6 +11,8 @@ export interface Session {
   status: SessionStatus;
   containerId?: string;
   containerName?: string;
+  threadId?: string;
+  ampLogPath?: string;
   createdAt: Date;
   lastAccessedAt: Date;
   expiresAt: Date;
