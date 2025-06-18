@@ -43,12 +43,14 @@ class ApiClient {
         const text = await response.text();
         data = {
           success: false,
-          message: text || `HTTP ${response.status}: ${response.statusText}`
+          error: text || `HTTP ${response.status}: ${response.statusText}`
         };
       }
       
       if (!response.ok) {
-        throw new Error(data.message || `HTTP ${response.status}: ${response.statusText}`);
+        // Try to extract error message from various possible fields
+        const errorMessage = data.error || data.message || `HTTP ${response.status}: ${response.statusText}`;
+        throw new Error(errorMessage);
       }
       
       return data;

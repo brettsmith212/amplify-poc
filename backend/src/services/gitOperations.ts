@@ -30,7 +30,7 @@ export interface GitOperationResult {
   message?: string;
   error?: string;
   commitHash?: string;
-  pullRequestUrl?: string;
+  pullRequestUrl?: string | undefined;
 }
 
 export class GitOperationsService {
@@ -119,20 +119,31 @@ export class GitOperationsService {
    */
   async getStatus(sessionId: string): Promise<GitOperationResult> {
     try {
-      const result = await this.executeGitCommand(sessionId, ['status', '--porcelain']);
+      // Get both working tree status and push status
+      const statusResult = await this.executeGitCommand(sessionId, ['status', '--porcelain']);
+      const pushStatusResult = await this.executeGitCommand(sessionId, ['status', '--porcelain', '-b']);
       
-      if (!result.success) {
+      if (!statusResult.success) {
         return {
           success: false,
-          error: result.error || 'Failed to get git status'
+          error: statusResult.error || 'Failed to get git status'
         };
       }
 
-      const hasChanges = result.output.trim().length > 0;
+      const hasChanges = statusResult.output.trim().length > 0;
+      
+      // Check if we're ahead of remote
+      let statusMessage = hasChanges ? 'Repository has uncommitted changes' : 'Working tree clean';
+      if (pushStatusResult.success) {
+        const branchStatus = pushStatusResult.output;
+        if (branchStatus.includes('[ahead ') || branchStatus.includes('ahead ')) {
+          statusMessage += pushStatusResult.success ? ` (${branchStatus.split('\n')[0]})` : ' (has unpushed commits)';
+        }
+      }
       
       return {
         success: true,
-        message: hasChanges ? 'Repository has uncommitted changes' : 'Working tree clean',
+        message: statusMessage,
         // Include change details in result for frontend consumption
       };
 
@@ -246,7 +257,29 @@ export class GitOperationsService {
 
       // Get the commit hash
       const hashResult = await this.executeGitCommand(sessionId, ['rev-parse', 'HEAD']);
-      const commitHash = hashResult.success ? hashResult.output.trim() : undefined;
+      let commitHash: string | undefined = undefined;
+      if (hashResult.success) {
+        const rawHash = hashResult.output.trim();
+        // Validate that it's a 40-character hex string (valid git hash)
+        if (/^[a-f0-9]{40}$/i.test(rawHash)) {
+          commitHash = rawHash;
+        } else {
+          gitLogger.warn('Invalid commit hash format', {
+            sessionId,
+            rawHash,
+            length: rawHash.length
+          });
+        }
+      }
+      
+      // Debug logging for commit hash
+      gitLogger.debug('Commit hash result', {
+        sessionId,
+        hashSuccess: hashResult.success,
+        rawOutput: hashResult.output,
+        validatedHash: commitHash,
+        hashLength: commitHash?.length
+      });
 
       gitLogger.info('Changes committed successfully', {
         sessionId,
@@ -284,7 +317,19 @@ export class GitOperationsService {
         createPR: options.createPullRequest
       });
 
-      // Get current branch
+      // TODO: Configure git authentication with user's GitHub token
+      // This is a critical missing piece - we need the user's GitHub token to push
+      gitLogger.warn('Git push attempted without proper authentication configuration', {
+        sessionId
+      });
+
+      // For now, return an informative error until we implement GitHub token integration
+      return {
+        success: false,
+        error: 'Push functionality requires GitHub authentication setup. This feature is not yet fully implemented - commits are saved locally but cannot be pushed to GitHub without proper token configuration.'
+      };
+
+      // Get current branch (disabled for now)
       const branchResult = await this.executeGitCommand(sessionId, ['branch', '--show-current']);
       if (!branchResult.success) {
         return {
@@ -294,6 +339,14 @@ export class GitOperationsService {
       }
 
       const currentBranch = branchResult.output.trim();
+      
+      // Check remote configuration
+      const remoteResult = await this.executeGitCommand(sessionId, ['remote', '-v']);
+      gitLogger.debug('Git remote configuration', {
+        sessionId,
+        currentBranch,
+        remotes: remoteResult.output
+      });
 
       // Prepare push command
       const pushCommand = ['push'];
@@ -306,6 +359,13 @@ export class GitOperationsService {
       const pushResult = await this.executeGitCommand(sessionId, pushCommand);
 
       if (!pushResult.success) {
+        gitLogger.error('Git push failed', {
+          sessionId,
+          command: pushCommand.join(' '),
+          error: pushResult.error,
+          output: pushResult.output
+        });
+        
         return {
           success: false,
           error: pushResult.error || 'Failed to push changes'
@@ -333,7 +393,7 @@ export class GitOperationsService {
       return {
         success: true,
         message: 'Changes pushed successfully',
-        ...(pullRequestUrl && { pullRequestUrl })
+        pullRequestUrl
       };
 
     } catch (error: any) {

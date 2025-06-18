@@ -14,6 +14,7 @@ export const DiffPage: React.FC = () => {
   const [diffData, setDiffData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [hasUnpushedCommits, setHasUnpushedCommits] = useState(false);
 
   const {
     committing,
@@ -24,6 +25,24 @@ export const DiffPage: React.FC = () => {
     push,
     clearError: clearGitError
   } = useGit();
+
+  // Check for unpushed commits
+  const checkUnpushedCommits = useCallback(async () => {
+    if (!sessionId) return;
+    
+    try {
+      const response = await api.get(`/sessions/${sessionId}/git/status`);
+      if (response.success && response.data) {
+        // Check if git status indicates commits ahead of origin
+        const status = response.data.status || '';
+        const hasUnpushed = status.includes('ahead') || status.includes('Your branch is ahead');
+        setHasUnpushedCommits(hasUnpushed);
+      }
+    } catch (err: any) {
+      // Silently fail for git status check
+      console.warn('Failed to check git status:', err.message);
+    }
+  }, [sessionId]);
 
   // Simple diff fetching
   const fetchDiff = useCallback(async () => {
@@ -39,12 +58,15 @@ export const DiffPage: React.FC = () => {
       } else {
         setError(response.error || 'Failed to load diff');
       }
+      
+      // Also check for unpushed commits
+      await checkUnpushedCommits();
     } catch (err: any) {
       setError(err.message || 'Failed to load diff');
     } finally {
       setLoading(false);
     }
-  }, [sessionId]);
+  }, [sessionId, checkUnpushedCommits]);
 
   useEffect(() => {
     fetchDiff();
@@ -59,7 +81,16 @@ export const DiffPage: React.FC = () => {
     
     const result = await commit(sessionId, commitData);
     if (result.success) {
-      setSuccessMessage(`Changes committed successfully${result.commitHash ? ` (${result.commitHash.substring(0, 8)})` : ''}`);
+      // Validate commit hash - should be a 40-character hex string
+      let hashDisplay = '';
+      if (result.commitHash && typeof result.commitHash === 'string' && /^[a-f0-9]{40}$/i.test(result.commitHash)) {
+        hashDisplay = ` (${result.commitHash.substring(0, 8)})`;
+      }
+      setSuccessMessage(`Changes committed successfully${hashDisplay}`);
+      
+      // Mark that we have unpushed commits
+      setHasUnpushedCommits(true);
+      
       // Refresh diff data after commit
       await fetchDiff();
     }
@@ -74,6 +105,8 @@ export const DiffPage: React.FC = () => {
     const result = await push(sessionId, pushOptions);
     if (result.success) {
       setSuccessMessage(`Changes pushed successfully${result.pullRequestUrl ? ` - ${result.pullRequestUrl}` : ''}`);
+      // After successful push, we no longer have unpushed commits
+      setHasUnpushedCommits(false);
     }
   }, [sessionId, push, clearGitError]);
 
@@ -166,20 +199,23 @@ export const DiffPage: React.FC = () => {
         </div>
       )}
 
-      {/* Git Operations Panel */}
-      {showGitOperations && diffData?.hasChanges && (
+
+
+      {/* Git Operations Panel - Show when Git Actions is toggled */}
+      {showGitOperations && (
         <div className="mb-6 p-6 bg-gray-50 dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700">
           <div className="grid md:grid-cols-2 gap-6">
             <CommitPanel
               onCommit={handleCommit}
               committing={committing}
-              disabled={committing || pushing}
+              disabled={committing || pushing || !diffData?.hasChanges}
+              hasChanges={diffData?.hasChanges || false}
             />
             
             <GitActions
               onPush={handlePush}
               pushing={pushing}
-              hasCommits={!!lastCommitHash}
+              hasCommits={!!lastCommitHash || hasUnpushedCommits}
               disabled={committing || pushing}
             />
           </div>

@@ -48,13 +48,13 @@ const TerminalPage = () => {
           <Terminal 
             className="h-full w-full"
             {...(sessionId && { sessionId })}
-            onReady={(terminal) => {
+            onReady={(_terminal) => {
               // Terminal ready
             }}
-            onData={(data) => {
+            onData={(_data) => {
               // Terminal input received
             }}
-            onResize={(dimensions) => {
+            onResize={(_dimensions) => {
               // Terminal resized
             }}
           />
