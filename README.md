@@ -1,26 +1,26 @@
 # Amplify POC
 
-> **Create an _ephemeral_ Docker container that mounts the current repo read-only, already has the `amp` CLI installed, and exposes a browser terminal that forwards commands to `amp` running inside the container.**
+> **Multi-session web service that creates ephemeral Docker containers with the `amp` CLI. Users authenticate with GitHub OAuth, clone repositories into containers, and interact through browser terminals.**
 
 ## Architecture
 
 ```
-local shell           Amplify CLI (Node)           Container
-┌──────────┐  build   ┌────────────────────┐ run   ┌──────────────┐
-│  user    │ ───────▶ │  amplify (orch.)   │ ────▶ │ amplify-base │
-└──────────┘          │  • builds image    │       │ • amp CLI    │
-                      │  • runs container  │  WS   │ • /workspace │
-┌─────────────────────┴────────────────────┴───────┴──────────────┐
-│ Browser http://localhost:3000 ←→ WebSocket ←→ docker exec -it   │
-│            (xterm.js)                                           │
-└──────────────────────────────────────────────────────────────────┘
+Web Browser            Amplify Web Service           Containers
+┌──────────┐ GitHub   ┌────────────────────┐ spawn  ┌──────────────┐
+│  user    │ OAuth   ▶│  • session mgmt    │ ────▶  │ amplify-base │
+└──────────┘          │  • git clone       │        │ • amp CLI    │
+                      │  • multi-user      │   WS   │ • /workspace │
+┌─────────────────────┴────────────────────┴────────┴──────────────┐
+│ Browser http://localhost:3000 ←→ WebSocket ←→ docker exec -it    │
+│  • Session dashboard  • Terminal  • Diff viewer                  │
+└───────────────────────────────────────────────────────────────────┘
 ```
 
 ## Project Structure
 
 ```
 amplify-poc/
-├── backend/              # Node.js CLI backend
+├── backend/              # Node.js web service backend
 │   ├── package.json      # Backend dependencies
 │   ├── tsconfig.json     # Backend TypeScript config
 │   └── src/              # Backend source code

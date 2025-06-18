@@ -1,25 +1,15 @@
-.PHONY: build install clean dev test help
+.PHONY: build clean dev test help
 
 # Default target
-all: build install
+all: build
 
-# Build frontend and backend, then install globally
+# Build frontend and backend
 build:
 	@echo "🔨 Building frontend..."
 	cd frontend && npm run build
 	@echo "🔨 Building backend..."
 	cd backend && npm run build
 	@echo "✅ Build complete"
-
-# Install amplify globally
-install:
-	@echo "📦 Installing amplify globally..."
-	cd backend && npm install -g .
-	@echo "✅ Amplify installed globally"
-	@echo "🚀 You can now run 'amplify' from any directory"
-
-# Build and install in one command
-build-install: build install
 
 # Clean build artifacts
 clean:
@@ -34,7 +24,7 @@ dev:
 	@echo "Backend: http://localhost:3000"
 	@echo "Frontend: http://localhost:5173"
 	@trap 'kill $$(jobs -p) 2>/dev/null; exit' INT TERM; \
-	cd backend && npm run dev:web & \
+	cd backend && npm run dev & \
 	BACKEND_PID=$$!; \
 	cd frontend && npm run dev & \
 	FRONTEND_PID=$$!; \
@@ -65,10 +55,8 @@ docker-build:
 help:
 	@echo "Available targets:"
 	@echo "  build         - Build frontend and backend"
-	@echo "  install       - Install amplify globally"
-	@echo "  build-install - Build and install in one command"
 	@echo "  clean         - Clean build artifacts"
-	@echo "  dev           - Start development server"
+	@echo "  dev           - Start development servers"
 	@echo "  deps          - Install dependencies"
 	@echo "  test          - Run tests"
 	@echo "  docker-build  - Build Docker base image"
