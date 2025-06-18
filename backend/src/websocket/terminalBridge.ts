@@ -14,6 +14,7 @@ export interface TerminalSession {
   shellSessionId?: string;
   isActive: boolean;
   sessionInfo?: TerminalSessionInfo;
+  repositoryName?: string;
 }
 
 export class TerminalBridge {
@@ -118,13 +119,26 @@ export class TerminalBridge {
     const sessionInfo = this.sessionManager.createSession(clientInfo);
     const messageHandler = new WebSocketMessageHandler();
     
+    // Get repository name if connecting to a specific session
+    let repositoryName: string | undefined;
+    if (sessionId) {
+      try {
+        const { sessionStore } = await import('../services/sessionStore');
+        const sessionData = sessionStore.getSession(sessionId);
+        repositoryName = sessionData?.repositoryName;
+      } catch (error) {
+        logger.warn(`Could not get repository name for session ${sessionId}: ${error}`);
+      }
+    }
+    
     const session: TerminalSession = {
       id: terminalSessionId,
       websocket,
       execManager,
       messageHandler,
       isActive: true,
-      sessionInfo
+      sessionInfo,
+      ...(repositoryName && { repositoryName })
     };
 
     this.sessions.set(terminalSessionId, session);
@@ -207,8 +221,13 @@ export class TerminalBridge {
       const shellSessionId = generateSessionId();
       session.shellSessionId = shellSessionId;
 
-      // Use /workspace as working directory - the entrypoint script handles repo cloning
-      const workingDir = '/workspace';
+      // Use /workspace/<repo-name> as working directory if we have repository name
+      let workingDir = '/workspace';
+      if (session.repositoryName) {
+        // Extract just the repo name from "owner/repo" format
+        const repoName = session.repositoryName.split('/').pop();
+        workingDir = `/workspace/${repoName}`;
+      }
 
       // Create shell exec session
       const execSession = await session.execManager.createExecSession(shellSessionId, {
@@ -257,7 +276,7 @@ export class TerminalBridge {
       }, 100);
       
       // Update session manager with shell info
-      this.sessionManager.updateShellInfo(session.id, shellSessionId, '/workspace');
+      this.sessionManager.updateShellInfo(session.id, shellSessionId, workingDir);
       
       logger.info(`Started shell session ${shellSessionId} for terminal ${session.id}`);
     } catch (error) {
