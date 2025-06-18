@@ -24,7 +24,7 @@
   - **Step Dependencies**: Step 1
   - **User Instructions**: This creates the parsing engine. Test by providing sample amp.log files and verifying correct ThreadMessage output.
 
-- [ ] Step 3: Build LogTailer Service
+- [x] Step 3: Build LogTailer Service
   - **Task**: Implement LogTailer service that watches amp.log files for changes and streams new lines to AmpLogParser in real-time
   - **Description**: This enables real-time streaming of log updates to the UI. The service uses fs.watch with debouncing to efficiently track file changes and parse new content.
   - **Files**:
