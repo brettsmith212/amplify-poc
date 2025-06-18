@@ -33,7 +33,12 @@ dev:
 	@echo "🚀 Starting development servers..."
 	@echo "Backend: http://localhost:3000"
 	@echo "Frontend: http://localhost:5173"
-	cd backend && npm run dev:web & cd frontend && npm run dev & wait
+	@trap 'kill $$(jobs -p) 2>/dev/null; exit' INT TERM; \
+	cd backend && npm run dev:web & \
+	BACKEND_PID=$$!; \
+	cd frontend && npm run dev & \
+	FRONTEND_PID=$$!; \
+	wait $$BACKEND_PID $$FRONTEND_PID
 
 # Install dependencies for both frontend and backend
 deps:
