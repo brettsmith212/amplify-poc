@@ -3,6 +3,8 @@ import { AuthProvider } from './contexts/AuthContext';
 import Layout from './components/Layout';
 import TerminalPage from './pages/TerminalPage';
 import { useAuth } from './hooks/useAuth';
+import ErrorBoundary from './components/ErrorBoundary';
+import { LoadingSpinner } from './components/LoadingSpinner';
 
 import LoginPage from './pages/LoginPage';
 import CreateSessionPage from './pages/CreateSessionPage';
@@ -18,10 +20,7 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   if (loading) {
     return (
       <div className="flex-1 flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-gray-400">Loading...</p>
-        </div>
+        <LoadingSpinner size="lg" text="Loading..." />
       </div>
     );
   }
@@ -96,9 +95,11 @@ const AppContent = () => {
 
 function App() {
   return (
-    <AuthProvider>
-      <AppContent />
-    </AuthProvider>
+    <ErrorBoundary>
+      <AuthProvider>
+        <AppContent />
+      </AuthProvider>
+    </ErrorBoundary>
   );
 }
 

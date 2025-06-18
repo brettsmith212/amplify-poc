@@ -9,6 +9,11 @@ import {
   getAuthenticatedUser 
 } from '../middleware/auth';
 import { generalRateLimit } from '../middleware/rateLimit';
+import { 
+  validateCreateSession,
+  validateSessionId,
+  handleServerError 
+} from '../middleware/validation';
 import * as sessionController from '../controllers/sessionController';
 import { logger } from '../utils/logger';
 
@@ -74,19 +79,15 @@ router.get('/', async (req: Request, res: Response): Promise<void> => {
  * POST /api/sessions
  * Create a new session with GitHub repository cloning
  */
-router.post('/', async (req: Request, res: Response): Promise<void> => {
+router.post('/', validateCreateSession, async (req: Request, res: Response): Promise<void> => {
   try {
     const user = getAuthenticatedUser(req)!;
     const { repositoryUrl, branch, sessionName } = req.body;
 
-    // Validate required fields
-    if (!repositoryUrl) {
-      res.status(400).json({
-        error: 'Invalid request',
-        message: 'Repository URL is required'
-      });
-      return;
-    }
+    sessionRoutesLogger.info('Session creation request body', {
+      userId: user.id,
+      body: req.body
+    });
 
     sessionRoutesLogger.info('Creating new session', {
       userId: user.id,
@@ -153,7 +154,7 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
  * GET /api/sessions/:sessionId
  * Get a specific session by ID
  */
-router.get('/:sessionId', async (req: Request, res: Response): Promise<void> => {
+router.get('/:sessionId', validateSessionId, async (req: Request, res: Response): Promise<void> => {
   try {
     const user = getAuthenticatedUser(req)!;
     const { sessionId } = req.params;
@@ -534,5 +535,8 @@ router.get('/:sessionId/status', async (req: Request, res: Response): Promise<vo
     });
   }
 });
+
+// Add error handling middleware to catch any unhandled errors
+router.use(handleServerError);
 
 export default router;
