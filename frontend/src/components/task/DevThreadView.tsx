@@ -1,9 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { getOrCreateDevSession, DevSessionData, isDevModeAvailable } from '../../services/devSession';
-import MessageBubble from './MessageBubble';
-import MessageInput from './MessageInput';
-import useAutoScroll from '../../hooks/useAutoScroll';
-import useDevThreadHistory from '../../hooks/useDevThreadHistory';
+import React, { useState, useEffect, useRef } from 'react';
+import { getOrCreateDevSession, DevSessionData, isDevModeAvailable, clearDevSession, createDevSession } from '../../services/devSession';
+import DevThreadInterface from './DevThreadInterface';
 
 interface DevThreadViewProps {
   onError?: (error: Error) => void;
@@ -17,9 +14,16 @@ export const DevThreadView: React.FC<DevThreadViewProps> = ({ onError }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
   const [isDevMode, setIsDevMode] = useState<boolean>(false);
+  const setupInProgress = useRef(false);
 
   useEffect(() => {
     const setupDevSession = async () => {
+      // Prevent double execution in React Strict Mode
+      if (setupInProgress.current) {
+        return;
+      }
+      setupInProgress.current = true;
+
       try {
         setIsLoading(true);
         setError(null);
@@ -51,6 +55,29 @@ export const DevThreadView: React.FC<DevThreadViewProps> = ({ onError }) => {
     setupDevSession();
   }, [onError]);
 
+  const handleNewThread = async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      
+      // Clear the old session
+      clearDevSession();
+      
+      // Create a new session
+      const newSession = await createDevSession();
+      setDevSession(newSession);
+      
+      console.log('New development session created:', newSession);
+    } catch (err) {
+      const error = err instanceof Error ? err : new Error('Failed to create new thread');
+      setError(error);
+      onError?.(error);
+      console.error('Failed to create new thread:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -81,10 +108,9 @@ export const DevThreadView: React.FC<DevThreadViewProps> = ({ onError }) => {
             {error.message}
           </p>
           {!isDevMode && (
-            <div className="text-sm text-gray-500">
-              <p>Make sure the backend is running with:</p>
-              <code className="bg-gray-100 px-2 py-1 rounded mt-1 block">npm run dev</code>
-            </div>
+            <p className="text-sm text-gray-500 mb-4">
+              Make sure the backend server is running on localhost:3000
+            </p>
           )}
           <button
             onClick={() => window.location.reload()}
@@ -111,173 +137,8 @@ export const DevThreadView: React.FC<DevThreadViewProps> = ({ onError }) => {
   return (
     <DevThreadInterface 
       sessionId={devSession.sessionId}
+      onNewThread={handleNewThread}
     />
-  );
-};
-
-/**
- * Simple thread interface for development that doesn't use authentication
- */
-const DevThreadInterface: React.FC<{ sessionId: string }> = ({ sessionId }) => {
-  const {
-    messages,
-    isLoading,
-    error,
-    loadHistory,
-    addMessage
-  } = useDevThreadHistory({
-    sessionId,
-    autoLoad: false, // Disable auto-load to prevent infinite loop
-    apiBaseUrl: 'http://localhost:3000'
-  });
-
-  const {
-    scrollRef: messagesEndRef,
-    scrollToBottom
-  } = useAutoScroll({
-    dependencies: [messages.length],
-    enabled: true
-  });
-
-  const handleSendMessage = async (content: string): Promise<void> => {
-    try {
-      // Add user message immediately
-      const userMessage = {
-        id: `user-${Date.now()}`,
-        role: 'user' as const,
-        content,
-        ts: new Date().toISOString(),
-        metadata: {}
-      };
-      
-      addMessage(userMessage);
-      
-      // Send message to amp via the backend
-      const response = await fetch(`http://localhost:3000/api/dev/thread/${sessionId}/message`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ content }),
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to send message: ${response.status} ${response.statusText}`);
-      }
-
-      const data = await response.json();
-      
-      if (data.success && data.response) {
-        // Add amp response message
-        const ampMessage = {
-          id: `amp-${Date.now()}`,
-          role: 'amp' as const,
-          content: data.response,
-          ts: new Date().toISOString(),
-          metadata: {}
-        };
-        addMessage(ampMessage);
-      } else if (!data.success) {
-        // Add error message
-        const errorMessage = {
-          id: `error-${Date.now()}`,
-          role: 'system' as const,
-          content: `Error: ${data.message || 'Failed to get response from amp'}`,
-          ts: new Date().toISOString(),
-          metadata: {}
-        };
-        addMessage(errorMessage);
-      }
-      
-    } catch (error) {
-      console.error('Error sending message:', error);
-      
-      // Add error message to chat
-      const errorMessage = {
-        id: `error-${Date.now()}`,
-        role: 'system' as const,
-        content: `Error: ${error instanceof Error ? error.message : 'Unknown error occurred'}`,
-        ts: new Date().toISOString(),
-        metadata: {}
-      };
-      addMessage(errorMessage);
-    }
-  };
-
-  if (error) {
-    return (
-      <div className="flex-1 flex items-center justify-center p-4">
-        <div className="text-center">
-          <div className="text-red-400 mb-2">⚠️ Thread Error</div>
-          <div className="text-sm text-gray-400">{error.message}</div>
-          <button
-            onClick={() => loadHistory()}
-            className="mt-2 px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
-          >
-            Retry
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="flex-1 flex flex-col h-full bg-gray-900 text-white">
-      {/* Messages Area */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4 min-h-0">
-        {isLoading && messages.length === 0 ? (
-          <div className="flex items-center justify-center h-full">
-            <div className="text-center">
-              <div className="mb-4">
-                <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-              </div>
-              <p className="text-gray-400">Loading messages...</p>
-            </div>
-          </div>
-        ) : (
-          <>
-            {messages.length === 0 ? (
-              <div className="flex items-center justify-center h-full">
-                <div className="text-center">
-                  <div className="text-gray-400 mb-2">💬 Development Thread</div>
-                  <div className="text-sm text-gray-500">Start a conversation with amp</div>
-                </div>
-              </div>
-            ) : (
-              messages.map((message) => (
-                <MessageBubble
-                  key={message.id}
-                  message={message}
-                  className="mb-4"
-                />
-              ))
-            )}
-            <div ref={messagesEndRef} />
-          </>
-        )}
-      </div>
-
-      {/* Scroll to bottom button */}
-      <div className="px-4 py-2 bg-gray-800/50 border-t border-gray-700/50">
-        <button
-          onClick={scrollToBottom}
-          className="text-sm text-blue-400 hover:text-blue-300 flex items-center space-x-1"
-        >
-          <span>↓</span>
-          <span>Scroll to bottom</span>
-        </button>
-      </div>
-
-      {/* Message Input */}
-      <div className="border-t border-gray-700/50 bg-gray-800/30">
-        <MessageInput
-          onSendMessage={handleSendMessage}
-          disabled={false}
-          placeholder="Send a message to amp..."
-          className="w-full"
-        />
-      </div>
-    </div>
   );
 };
 

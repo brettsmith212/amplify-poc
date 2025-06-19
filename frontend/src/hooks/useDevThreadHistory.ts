@@ -99,6 +99,8 @@ export const useDevThreadHistory = (options: UseDevThreadHistoryOptions): UseDev
     apiBaseUrl = 'http://localhost:3000'
   } = options;
   
+  console.log('useDevThreadHistory called with:', { sessionId, autoLoad, pageSize, apiBaseUrl });
+  
   // State
   const [messages, setMessages] = useState<ThreadMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -111,6 +113,7 @@ export const useDevThreadHistory = (options: UseDevThreadHistoryOptions): UseDev
   // Refs
   const loadingRef = useRef(false);
   const mountedRef = useRef(true);
+  const hasAutoLoaded = useRef(false);
   
   // Cleanup on unmount
   useEffect(() => {
@@ -118,6 +121,11 @@ export const useDevThreadHistory = (options: UseDevThreadHistoryOptions): UseDev
       mountedRef.current = false;
     };
   }, []);
+
+  // Reset auto-load flag when session changes
+  useEffect(() => {
+    hasAutoLoaded.current = false;
+  }, [sessionId]);
 
   /**
    * Convert API response to ThreadMessage format
@@ -183,12 +191,24 @@ export const useDevThreadHistory = (options: UseDevThreadHistoryOptions): UseDev
    * Load the initial set of messages
    */
   const loadHistory = useCallback(async (): Promise<void> => {
-    if (isLoading || !sessionId || !mountedRef.current) return;
+    console.log('loadHistory called, checking conditions:', {
+      isLoading,
+      sessionId,
+      mountedRefCurrent: mountedRef.current
+    });
     
+    if (isLoading || !sessionId || !mountedRef.current) {
+      console.log('loadHistory early return');
+      return;
+    }
+    
+    console.log('loadHistory setting isLoading to true');
     setIsLoading(true);
     
     try {
+      console.log('loadHistory calling loadMessages');
       const result = await loadMessages();
+      console.log('loadHistory got result:', result);
       
       if (mountedRef.current) {
         setMessages(result.messages);
@@ -196,19 +216,20 @@ export const useDevThreadHistory = (options: UseDevThreadHistoryOptions): UseDev
         setTotalCount(result.total);
         setNextCursor(result.nextCursor);
         setIsInitialLoad(false);
+        console.log('loadHistory updated state successfully');
       }
     } catch (err) {
+      console.error('loadHistory error:', err);
       if (mountedRef.current) {
         const errorObj = err instanceof Error ? err : new Error('Failed to load thread history');
         setError(errorObj);
         console.error('Error loading thread history:', errorObj);
       }
     } finally {
-      if (mountedRef.current) {
-        setIsLoading(false);
-      }
+      console.log('loadHistory setting isLoading to false (regardless of mount status)');
+      setIsLoading(false);
     }
-  }, [isLoading, sessionId, loadMessages]);
+  }, [sessionId, loadMessages]);
   
   /**
    * Load more messages (pagination)
@@ -244,31 +265,44 @@ export const useDevThreadHistory = (options: UseDevThreadHistoryOptions): UseDev
    * Refresh the current page of messages
    */
   const refreshHistory = useCallback(async (): Promise<void> => {
-    if (isLoading || !sessionId || !mountedRef.current) return;
+    console.log('refreshHistory called, checking conditions:', {
+      isLoading,
+      sessionId,
+      mountedRefCurrent: mountedRef.current
+    });
     
+    if (isLoading || !sessionId || !mountedRef.current) {
+      console.log('refreshHistory early return due to conditions');
+      return;
+    }
+    
+    console.log('refreshHistory setting isLoading to true');
     setIsLoading(true);
     
     try {
+      console.log('refreshHistory calling loadMessages');
       const result = await loadMessages(undefined, true);
+      console.log('refreshHistory got result:', result);
       
       if (mountedRef.current) {
         setMessages(result.messages);
         setHasMore(result.hasMore);
         setTotalCount(result.total);
         setNextCursor(result.nextCursor);
+        console.log('refreshHistory updated state with messages:', result.messages.length);
       }
     } catch (err) {
+      console.error('refreshHistory error:', err);
       if (mountedRef.current) {
         const errorObj = err instanceof Error ? err : new Error('Failed to refresh thread history');
         setError(errorObj);
         console.error('Error refreshing thread history:', errorObj);
       }
     } finally {
-      if (mountedRef.current) {
-        setIsLoading(false);
-      }
+      console.log('refreshHistory setting isLoading to false');
+      setIsLoading(false);
     }
-  }, [isLoading, sessionId, loadMessages]);
+  }, [sessionId, loadMessages]);
   
   /**
    * Clear all loaded messages and reset state
@@ -315,8 +349,22 @@ export const useDevThreadHistory = (options: UseDevThreadHistoryOptions): UseDev
   
   // Auto-load history on mount if enabled
   useEffect(() => {
-    if (autoLoad && sessionId && isInitialLoad && !isLoading && !loadingRef.current && mountedRef.current) {
+    console.log('AutoLoad effect running:', {
+      autoLoad,
+      sessionId,
+      isInitialLoad,
+      isLoading,
+      loadingRefCurrent: loadingRef.current,
+      mountedRefCurrent: mountedRef.current,
+      hasAutoLoadedCurrent: hasAutoLoaded.current
+    });
+    
+    if (autoLoad && sessionId && isInitialLoad && !isLoading && !loadingRef.current && mountedRef.current && !hasAutoLoaded.current) {
+      console.log('AutoLoad triggering loadHistory for session:', sessionId);
+      hasAutoLoaded.current = true;
       loadHistory();
+    } else {
+      console.log('AutoLoad skipped - conditions not met');
     }
   }, [autoLoad, sessionId, isInitialLoad, isLoading, loadHistory]);
   

@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { sessionStore } from '../services/sessionStore';
 import { ampService } from '../services/ampService';
+import * as fs from 'fs/promises';
 import { logger } from '../utils/logger';
 import { Session, SessionStatus } from '../models/Session';
 import {
@@ -13,6 +14,57 @@ import {
 
 const router = Router();
 const devLogger = logger.child('DevThreadRoutes');
+
+interface ParsedMessage {
+  id: string;
+  type: 'user' | 'assistant';
+  content: string;
+  timestamp: string;
+  metadata?: Record<string, any>;
+}
+
+/**
+ * Get the structured message store path for a session
+ */
+function getMessageStorePath(sessionId: string): string {
+  return `/tmp/amplify-data/${sessionId}/messages.json`;
+}
+
+/**
+ * Load messages from structured message store
+ */
+async function loadSessionMessages(sessionId: string): Promise<ParsedMessage[]> {
+  try {
+    const messageStorePath = getMessageStorePath(sessionId);
+    const content = await fs.readFile(messageStorePath, 'utf-8');
+    return JSON.parse(content);
+  } catch (error) {
+    // If file doesn't exist or can't be read, return empty array
+    return [];
+  }
+}
+
+/**
+ * Save messages to structured message store
+ */
+async function saveSessionMessages(sessionId: string, messages: ParsedMessage[]): Promise<void> {
+  try {
+    const messageStorePath = getMessageStorePath(sessionId);
+    await fs.writeFile(messageStorePath, JSON.stringify(messages, null, 2));
+  } catch (error) {
+    devLogger.error('Error saving session messages:', { sessionId, error });
+    throw error;
+  }
+}
+
+/**
+ * Add a message to the session message store
+ */
+async function addSessionMessage(sessionId: string, message: ParsedMessage): Promise<void> {
+  const messages = await loadSessionMessages(sessionId);
+  messages.push(message);
+  await saveSessionMessages(sessionId, messages);
+}
 
 // Disable rate limiting for development routes
 router.use((req, res, next) => {
@@ -146,6 +198,17 @@ router.post('/:sessionId/message', async (req: Request, res: Response): Promise<
       messageLength: content.length
     });
 
+    // Store the user message immediately
+    const userMessage: ParsedMessage = {
+      id: `user-${Date.now()}-${Math.random()}`,
+      type: 'user',
+      content,
+      timestamp: new Date().toISOString(),
+      metadata: { source: 'api' }
+    };
+    
+    await addSessionMessage(sessionId, userMessage);
+
     // Send message to amp using amp threads continue
     const result = await ampService.continueThread(session.threadId, content, {
       workingDirectory: `/tmp/amplify-data/${sessionId}`,
@@ -165,6 +228,17 @@ router.post('/:sessionId/message', async (req: Request, res: Response): Promise<
       });
       return;
     }
+
+    // Store the assistant response
+    const assistantMessage: ParsedMessage = {
+      id: `assistant-${Date.now()}-${Math.random()}`,
+      type: 'assistant',
+      content: result.response || 'No response received',
+      timestamp: new Date().toISOString(),
+      metadata: { source: 'amp' }
+    };
+    
+    await addSessionMessage(sessionId, assistantMessage);
 
     devLogger.info('Message sent to amp successfully', {
       sessionId,
@@ -192,17 +266,40 @@ router.post('/:sessionId/message', async (req: Request, res: Response): Promise<
  * GET /api/dev/thread/:sessionId/messages
  */
 router.get('/:sessionId/messages', async (req: Request, res: Response): Promise<void> => {
-  if (process.env.NODE_ENV === 'production') {
-    res.status(403).json({ error: 'Development routes not available in production' });
-    return;
-  }
+  try {
+    if (process.env.NODE_ENV === 'production') {
+      res.status(403).json({ error: 'Development routes not available in production' });
+      return;
+    }
 
-  // Create proper request object for the controller
-  const threadReq = req as GetThreadMessagesRequest;
-  threadReq.params = { sessionId: req.params.sessionId! };
-  
-  // Call the main thread controller
-  await getThreadMessages(threadReq, res);
+    const { sessionId } = req.params;
+    if (!sessionId) {
+      res.status(400).json({ error: 'Session ID is required' });
+      return;
+    }
+    
+    const session = sessionStore.getSession(sessionId);
+    if (!session) {
+      res.status(404).json({ error: 'Session not found' });
+      return;
+    }
+
+    // Load messages from structured message store
+    const messages = await loadSessionMessages(sessionId);
+    
+    res.json({
+      messages,
+      hasMore: false,
+      total: messages.length
+    });
+
+  } catch (error) {
+    devLogger.error('Error getting thread messages:', error);
+    res.status(500).json({
+      error: 'Internal server error',
+      message: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
 });
 
 /**
@@ -225,14 +322,56 @@ router.get('/:sessionId/latest', async (req: Request, res: Response): Promise<vo
  * GET /api/dev/thread/:sessionId/stats
  */
 router.get('/:sessionId/stats', async (req: Request, res: Response): Promise<void> => {
-  if (process.env.NODE_ENV === 'production') {
-    res.status(403).json({ error: 'Development routes not available in production' });
-    return;
-  }
+  try {
+    if (process.env.NODE_ENV === 'production') {
+      res.status(403).json({ error: 'Development routes not available in production' });
+      return;
+    }
 
-  const threadReq = req as any;
-  threadReq.params = { sessionId: req.params.sessionId! };
-  await getThreadStats(threadReq, res);
+    const { sessionId } = req.params;
+    if (!sessionId) {
+      res.status(400).json({ error: 'Session ID is required' });
+      return;
+    }
+    
+    const session = sessionStore.getSession(sessionId);
+    if (!session) {
+      res.status(404).json({ error: 'Session not found' });
+      return;
+    }
+
+    // Get message count from log file
+    let messageCount = 0;
+    let lastMessageTime: string | undefined;
+    
+    if (session.ampLogPath) {
+      try {
+        const messages = await parseAmpLogMessages(session.ampLogPath);
+        messageCount = messages.length;
+        if (messages.length > 0) {
+          lastMessageTime = messages[messages.length - 1]?.timestamp;
+        }
+      } catch (error) {
+        // Log error but continue with default values
+        devLogger.warn('Failed to parse messages for stats:', { sessionId, error });
+      }
+    }
+
+    res.json({
+      sessionId,
+      messageCount,
+      lastMessageTime,
+      threadId: session.threadId,
+      status: session.status
+    });
+
+  } catch (error) {
+    devLogger.error('Error getting thread stats:', error);
+    res.status(500).json({
+      error: 'Internal server error',
+      message: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
 });
 
 /**
