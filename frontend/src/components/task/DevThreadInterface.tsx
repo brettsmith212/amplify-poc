@@ -24,8 +24,7 @@ const DevThreadInterface: React.FC<DevThreadInterfaceProps> = ({ sessionId, onNe
   const mountedRef = useRef(true);
 
   const {
-    scrollRef: messagesEndRef,
-    scrollToBottom
+    scrollRef: messagesEndRef
   } = useAutoScroll({
     dependencies: [messages.length],
     enabled: true
@@ -181,20 +180,56 @@ const DevThreadInterface: React.FC<DevThreadInterfaceProps> = ({ sessionId, onNe
         const data = await response.json();
         const backendThreads = data.sessions || [];
         
-        // Merge local and backend thread data
-        const mergedThreads = localThreads.map((localThread: any) => {
-          const backendThread = backendThreads.find((bt: any) => bt.sessionId === localThread.sessionId);
-          return {
-            ...localThread,
-            messageCount: backendThread?.messageCount || 0,
-            lastMessage: backendThread?.lastMessage,
-            status: backendThread?.status || 'unknown'
-          };
-        }).filter((thread: any) => thread.sessionId !== sessionId); // Exclude current thread
+        // Only show threads that exist in the backend AND have valid data
+        const validThreads: any[] = [];
+        const invalidThreadIds: string[] = [];
         
-        setAvailableThreads(mergedThreads);
+        for (const localThread of localThreads) {
+          if (localThread.sessionId === sessionId) {
+            continue; // Skip current thread
+          }
+          
+          // Check if thread exists in backend
+          const backendThread = backendThreads.find((bt: any) => bt.sessionId === localThread.sessionId);
+          
+          if (backendThread) {
+            // Validate that the thread is actually accessible by checking messages
+            try {
+              const messagesResponse = await fetch(`http://localhost:3000/api/dev/thread/${localThread.sessionId}/messages`);
+              if (messagesResponse.ok) {
+                validThreads.push({
+                  ...localThread,
+                  messageCount: backendThread.messageCount || 0,
+                  lastMessage: backendThread.lastMessage,
+                  status: backendThread.status || 'active'
+                });
+              } else {
+                console.log('Thread not accessible:', localThread.sessionId);
+                invalidThreadIds.push(localThread.sessionId);
+              }
+            } catch (err) {
+              console.log('Error checking thread accessibility:', localThread.sessionId, err);
+              invalidThreadIds.push(localThread.sessionId);
+            }
+          } else {
+            console.log('Thread not found in backend:', localThread.sessionId);
+            invalidThreadIds.push(localThread.sessionId);
+          }
+        }
+        
+        // Clean up localStorage by removing invalid threads
+        if (invalidThreadIds.length > 0) {
+          const cleanedThreads = localThreads.filter((thread: any) => 
+            !invalidThreadIds.includes(thread.sessionId)
+          );
+          localStorage.setItem('dev-thread-history', JSON.stringify(cleanedThreads));
+          console.log('Cleaned up invalid threads from localStorage:', invalidThreadIds);
+        }
+        
+        setAvailableThreads(validThreads);
       } else {
-        // Fallback to just local threads
+        // Backend not available, only show threads from localStorage but don't validate
+        console.warn('Backend not available, showing cached threads without validation');
         setAvailableThreads(localThreads.filter((thread: any) => thread.sessionId !== sessionId));
       }
     } catch (error) {
@@ -286,12 +321,24 @@ const DevThreadInterface: React.FC<DevThreadInterfaceProps> = ({ sessionId, onNe
           <div className="space-y-4">
             <div className="flex justify-between items-center">
               <h2 className="text-xl font-semibold text-white">Existing Threads</h2>
-              <button
-                onClick={() => setShowThreadList(false)}
-                className="px-3 py-1 bg-gray-600 text-white text-sm rounded hover:bg-gray-700 transition-colors"
-              >
-                Back to Chat
-              </button>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => {
+                    // Force reload threads with validation
+                    loadAvailableThreads();
+                  }}
+                  className="px-3 py-1 bg-yellow-600 text-white text-xs rounded hover:bg-yellow-700 transition-colors"
+                  title="Refresh and clean up stale threads"
+                >
+                  Refresh
+                </button>
+                <button
+                  onClick={() => setShowThreadList(false)}
+                  className="px-3 py-1 bg-gray-600 text-white text-sm rounded hover:bg-gray-700 transition-colors"
+                >
+                  Back to Chat
+                </button>
+              </div>
             </div>
             
             {threadsLoading ? (
