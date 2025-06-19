@@ -234,6 +234,115 @@ export class SessionStore extends EventEmitter {
   }
 
   /**
+   * Get sessions by thread ID
+   */
+  getSessionByThreadId(threadId: string): Session | null {
+    for (const session of this.sessions.values()) {
+      if (session.threadId === threadId) {
+        return session;
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Get all sessions with active threads
+   */
+  getSessionsWithThreads(): Session[] {
+    return Array.from(this.sessions.values()).filter(session => 
+      session.threadId && session.ampLogPath
+    );
+  }
+
+  /**
+   * Update thread association for a session
+   */
+  updateThreadAssociation(sessionId: string, threadId: string, ampLogPath: string): boolean {
+    const session = this.sessions.get(sessionId);
+    if (!session) {
+      storeLogger.warn(`Cannot update thread association: session ${sessionId} not found`);
+      return false;
+    }
+
+    const updatedSession = {
+      ...session,
+      threadId,
+      ampLogPath,
+      lastAccessedAt: new Date()
+    };
+
+    this.sessions.set(sessionId, updatedSession);
+    
+    storeLogger.info(`Thread association updated for session: ${sessionId}`, {
+      threadId,
+      ampLogPath
+    });
+
+    this.emit('threadAssociationUpdated', sessionId, threadId, ampLogPath);
+    return true;
+  }
+
+  /**
+   * Remove thread association from a session
+   */
+  removeThreadAssociation(sessionId: string): boolean {
+    const session = this.sessions.get(sessionId);
+    if (!session) {
+      return false;
+    }
+
+    const updatedSession = {
+      ...session,
+      lastAccessedAt: new Date()
+    };
+
+    // Remove thread-related properties
+    delete (updatedSession as any).threadId;
+    delete (updatedSession as any).ampLogPath;
+
+    this.sessions.set(sessionId, updatedSession);
+    
+    storeLogger.info(`Thread association removed from session: ${sessionId}`);
+    this.emit('threadAssociationRemoved', sessionId);
+    return true;
+  }
+
+  /**
+   * Find sessions with orphaned threads (no active container)
+   */
+  findOrphanedThreadSessions(): Session[] {
+    return Array.from(this.sessions.values()).filter(session => 
+      session.threadId && 
+      session.ampLogPath && 
+      (!session.containerId || session.status === SessionStatus.STOPPED)
+    );
+  }
+
+  /**
+   * Get thread associations summary
+   */
+  getThreadAssociationStats(): {
+    totalSessions: number;
+    sessionsWithThreads: number;
+    orphanedThreads: number;
+    activeThreads: number;
+  } {
+    const allSessions = Array.from(this.sessions.values());
+    const sessionsWithThreads = allSessions.filter(s => s.threadId && s.ampLogPath);
+    const orphanedThreads = this.findOrphanedThreadSessions();
+    const activeThreads = sessionsWithThreads.filter(s => 
+      s.status === SessionStatus.RUNNING || s.status === SessionStatus.READY
+    );
+
+    return {
+      totalSessions: allSessions.length,
+      sessionsWithThreads: sessionsWithThreads.length,
+      orphanedThreads: orphanedThreads.length,
+      activeThreads: activeThreads.length
+    };
+  }
+
+  /**
    * Get session statistics
    */
   getStats(): SessionStats {

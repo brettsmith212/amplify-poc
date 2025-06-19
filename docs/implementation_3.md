@@ -172,7 +172,7 @@
   - **Step Dependencies**: Steps 1, 3
   - **User Instructions**: This integrates thread creation with sessions. Test by creating a new session and verifying thread bootstrap occurs.
 
-- [ ] Step 16: Implement Session-Thread Association
+- [x] Step 16: Implement Session-Thread Association
   - **Task**: Create database/storage associations between sessions and their thread data, including amp.log file management
   - **Description**: This establishes the persistent relationship between sessions and threads. Each session has an associated thread ID and amp.log file path that are maintained throughout the session lifecycle.
   - **Files**:
