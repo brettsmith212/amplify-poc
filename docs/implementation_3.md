@@ -58,9 +58,9 @@
 
 ## Frontend Core Components
 
-- [ ] Step 6: Create TaskTabs Navigation Component
+- [x] Step 6: Create TaskTabs Navigation Component
 
-  - **Task**: Build the tabbed navigation component with Thread, Terminal, and CI tabs, including ARIA compliance and keyboard navigation
+  - **Task**: Build the tabbed navigation component with Thread, Terminal, and Git Diff tabs, including ARIA compliance and keyboard navigation
   - **Description**: This provides the core navigation structure for the session page. The component supports tab switching, visual indicators, and accessibility features as specified in the UI documentation.
   - **Files**:
     - `frontend/src/components/task/TaskTabs.tsx`: Main tab navigation component
