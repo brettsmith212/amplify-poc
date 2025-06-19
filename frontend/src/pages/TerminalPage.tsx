@@ -1,9 +1,14 @@
+import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import Terminal from '../components/Terminal';
+import ThreadView from '../components/task/ThreadView';
+import TaskTabs from '../components/task/TaskTabs';
+import { TabType } from '../types/tabs';
 
 const TerminalPage = () => {
   const { sessionId } = useParams<{ sessionId: string }>();
   const navigate = useNavigate();
+  const [activeTab, setActiveTab] = useState<TabType>('terminal');
 
   const handleViewDiff = () => {
     if (sessionId) {
@@ -11,18 +16,80 @@ const TerminalPage = () => {
     }
   };
 
+  const handleTabChange = (tab: TabType) => {
+    if (tab === 'gitdiff') {
+      handleViewDiff();
+      return;
+    }
+    setActiveTab(tab);
+  };
+
+  const getTabTitle = () => {
+    switch (activeTab) {
+      case 'thread':
+        return 'conversation';
+      case 'terminal':
+        return 'terminal';
+      case 'gitdiff':
+        return 'git diff';
+      default:
+        return 'terminal';
+    }
+  };
+
+  const renderActiveContent = () => {
+    if (!sessionId) {
+      return (
+        <div className="h-full flex items-center justify-center text-gray-400">
+          <div className="text-center">
+            <div className="text-lg font-medium mb-2">No Session</div>
+            <div className="text-sm">Please select or create a session to continue.</div>
+          </div>
+        </div>
+      );
+    }
+
+    switch (activeTab) {
+      case 'thread':
+        return (
+          <ThreadView 
+            sessionId={sessionId}
+            className="h-full"
+          />
+        );
+      case 'terminal':
+        return (
+          <Terminal 
+            className="h-full w-full"
+            sessionId={sessionId}
+            onReady={(_terminal) => {
+              // Terminal ready
+            }}
+            onData={(_data) => {
+              // Terminal input received
+            }}
+            onResize={(_dimensions) => {
+              // Terminal resized
+            }}
+          />
+        );
+      default:
+        return null;
+    }
+  };
+
   return (
     <div className="flex-1 flex flex-col p-6 max-w-7xl mx-auto w-full">
-      <div className="flex-1 bg-gray-900 rounded-xl border border-gray-700/50 overflow-hidden relative shadow-2xl">
-        {/* Terminal Window Header */}
-        <div className="bg-gray-800/60 border-b border-gray-700/50 px-4 py-2 flex items-center justify-between">
+      <div className="flex-1 bg-gray-900 rounded-xl border border-gray-700/50 overflow-hidden relative shadow-2xl flex flex-col">
+        {/* Window Header */}
+        <div className="bg-gray-800/60 border-b border-gray-700/50 px-4 py-2 flex items-center justify-between flex-shrink-0">
           <div className="flex items-center space-x-3">
             <div className="flex space-x-1.5">
               <div className="w-3 h-3 bg-red-500 rounded-full"></div>
               <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
               <div className="w-3 h-3 bg-green-500 rounded-full"></div>
             </div>
-            <span className="text-sm text-gray-400 font-medium">terminal</span>
+            <span className="text-sm text-gray-400 font-medium">{getTabTitle()}</span>
             {sessionId && (
               <span className="text-xs text-gray-500 bg-gray-700/50 px-2 py-1 rounded">
                 Session: {sessionId}
@@ -42,22 +109,17 @@ const TerminalPage = () => {
             </button>
           </div>
         </div>
+
+        {/* Tab Navigation */}
+        <TaskTabs 
+          activeTab={activeTab}
+          onTabChange={handleTabChange}
+          className="flex-shrink-0"
+        />
         
-        {/* Terminal Content */}
-        <div className="h-full bg-gray-900">
-          <Terminal 
-            className="h-full w-full"
-            {...(sessionId && { sessionId })}
-            onReady={(_terminal) => {
-              // Terminal ready
-            }}
-            onData={(_data) => {
-              // Terminal input received
-            }}
-            onResize={(_dimensions) => {
-              // Terminal resized
-            }}
-          />
+        {/* Tab Content */}
+        <div className="flex-1 bg-gray-900 overflow-hidden">
+          {renderActiveContent()}
         </div>
       </div>
     </div>
