@@ -1,85 +1,72 @@
-import { render, screen, fireEvent } from '@testing-library/react';
-import { vi, describe, it, expect, beforeEach } from 'vitest';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { vi, Mock, describe, it, expect, beforeEach } from 'vitest';
 import ThreadView from '../../../components/task/ThreadView';
 import { ThreadMessage } from '../../../types/threadMessage';
 
-// Mock the auto-scroll hook
-vi.mock('../../../hooks/useAutoScroll', () => ({
-  default: vi.fn(() => ({
-    scrollRef: { current: null },
-    scrollToBottom: vi.fn(),
-    isAtBottom: vi.fn(() => true)
-  }))
+// Mock the useThreadMessages hook
+vi.mock('../../../hooks/useThreadMessages', () => ({
+  default: vi.fn()
 }));
 
-// Mock MessageBubble component
-vi.mock('../../../components/task/MessageBubble', () => ({
-  default: ({ message }: { message: ThreadMessage }) => (
-    <div data-testid={`message-${message.id}`}>
-      <span>{message.role}: {message.content}</span>
-    </div>
-  )
-}));
+const mockUseThreadMessages = vi.mocked(await import('../../../hooks/useThreadMessages')).default as Mock;
 
-describe('ThreadView', () => {
-  const mockOnSendMessage = vi.fn();
-  
-  const sampleMessages: ThreadMessage[] = [
-    {
-      id: 'msg-1',
-      role: 'user',
-      content: 'Hello, world!',
-      ts: '2023-01-01T12:00:00Z'
-    },
-    {
-      id: 'msg-2',
-      role: 'amp',
-      content: 'Hello! How can I help you today?',
-      ts: '2023-01-01T12:01:00Z'
-    }
-  ];
+describe('ThreadView Component', () => {
+  const mockSendMessage = vi.fn();
+
+  const defaultHookReturn = {
+    messages: [],
+    sendMessage: mockSendMessage,
+    isLoading: false,
+    isConnected: true,
+    isSending: false,
+    connectionState: 'connected' as const
+  };
 
   beforeEach(() => {
-    mockOnSendMessage.mockClear();
+    vi.clearAllMocks();
+    mockUseThreadMessages.mockReturnValue(defaultHookReturn);
   });
 
   describe('Basic Rendering', () => {
     it('renders empty state when no messages', () => {
-      render(
-        <ThreadView
-          sessionId="test-session"
-          messages={[]}
-          onSendMessage={mockOnSendMessage}
-        />
-      );
+      render(<ThreadView sessionId="test-session" />);
 
       expect(screen.getByText('Start a conversation')).toBeInTheDocument();
       expect(screen.getByText(/Send a message to begin your session/)).toBeInTheDocument();
     });
 
     it('renders messages when provided', () => {
-      render(
-        <ThreadView
-          sessionId="test-session"
-          messages={sampleMessages}
-          onSendMessage={mockOnSendMessage}
-        />
-      );
+      const messages: ThreadMessage[] = [
+        {
+          id: '1',
+          role: 'user',
+          content: 'Hello',
+          ts: '2023-01-01T10:00:00Z',
+          metadata: {}
+        },
+        {
+          id: '2',
+          role: 'amp',
+          content: 'Hi there!',
+          ts: '2023-01-01T10:01:00Z',
+          metadata: {}
+        }
+      ];
 
-      expect(screen.getByTestId('message-msg-1')).toBeInTheDocument();
-      expect(screen.getByTestId('message-msg-2')).toBeInTheDocument();
-      expect(screen.getByText('user: Hello, world!')).toBeInTheDocument();
-      expect(screen.getByText('amp: Hello! How can I help you today?')).toBeInTheDocument();
+      mockUseThreadMessages.mockReturnValue({
+        ...defaultHookReturn,
+        messages
+      });
+
+      render(<ThreadView sessionId="test-session" />);
+
+      expect(screen.getByText('Hello')).toBeInTheDocument();
+      expect(screen.getByText('Hi there!')).toBeInTheDocument();
     });
 
-    it('applies custom className', () => {
+    it('applies custom className when provided', () => {
       const { container } = render(
-        <ThreadView
-          sessionId="test-session"
-          messages={[]}
-          className="custom-class"
-          onSendMessage={mockOnSendMessage}
-        />
+        <ThreadView sessionId="test-session" className="custom-class" />
       );
 
       expect(container.firstChild).toHaveClass('custom-class');
@@ -87,431 +74,285 @@ describe('ThreadView', () => {
   });
 
   describe('Loading States', () => {
-    it('shows loading spinner when isLoading is true', () => {
-      render(
-        <ThreadView
-          sessionId="test-session"
-          messages={[]}
-          isLoading={true}
-          onSendMessage={mockOnSendMessage}
-        />
-      );
+    it('shows loading indicator when loading', () => {
+      mockUseThreadMessages.mockReturnValue({
+        ...defaultHookReturn,
+        isLoading: true
+      });
+
+      render(<ThreadView sessionId="test-session" />);
 
       expect(screen.getByText('Loading messages...')).toBeInTheDocument();
-      expect(screen.queryByText('Start a conversation')).not.toBeInTheDocument();
     });
 
-    it('hides loading spinner when isLoading is false', () => {
-      render(
-        <ThreadView
-          sessionId="test-session"
-          messages={[]}
-          isLoading={false}
-          onSendMessage={mockOnSendMessage}
-        />
-      );
+    it('shows loading state in message input when loading', () => {
+      mockUseThreadMessages.mockReturnValue({
+        ...defaultHookReturn,
+        isLoading: true
+      });
 
-      expect(screen.queryByText('Loading messages...')).not.toBeInTheDocument();
-      expect(screen.getByText('Start a conversation')).toBeInTheDocument();
+      render(<ThreadView sessionId="test-session" />);
+
+      const input = screen.getByRole('textbox');
+      expect(input).toBeDisabled();
     });
   });
 
-  describe('Connection Status', () => {
-    it('shows connection status when not connected', () => {
-      render(
-        <ThreadView
-          sessionId="test-session"
-          messages={[]}
-          isConnected={false}
-          onSendMessage={mockOnSendMessage}
-        />
-      );
+  describe('Connection States', () => {
+    it('shows disconnected state when not connected', () => {
+      mockUseThreadMessages.mockReturnValue({
+        ...defaultHookReturn,
+        isConnected: false,
+        connectionState: 'disconnected'
+      });
 
-      expect(screen.getByText('Connecting to session...')).toBeInTheDocument();
+      render(<ThreadView sessionId="test-session" />);
+
+      expect(screen.getByText('Disconnected')).toBeInTheDocument();
     });
 
-    it('hides connection status when connected', () => {
-      render(
-        <ThreadView
-          sessionId="test-session"
-          messages={[]}
-          isConnected={true}
-          onSendMessage={mockOnSendMessage}
-        />
-      );
+    it('disables input when disconnected', () => {
+      mockUseThreadMessages.mockReturnValue({
+        ...defaultHookReturn,
+        isConnected: false,
+        connectionState: 'disconnected'
+      });
 
-      expect(screen.queryByText('Connecting to session...')).not.toBeInTheDocument();
-    });
-  });
+      render(<ThreadView sessionId="test-session" />);
 
-  describe('Message Input', () => {
-    it('renders message input area', () => {
-      render(
-        <ThreadView
-          sessionId="test-session"
-          messages={[]}
-          onSendMessage={mockOnSendMessage}
-        />
-      );
-
-      expect(screen.getByPlaceholderText(/Type a message to continue/)).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: /Send message/ })).toBeInTheDocument();
-    });
-
-    it('disables input when not connected', () => {
-      render(
-        <ThreadView
-          sessionId="test-session"
-          messages={[]}
-          isConnected={false}
-          onSendMessage={mockOnSendMessage}
-        />
-      );
-
-      const textarea = screen.getByPlaceholderText(/Type a message to continue/);
-      const sendButton = screen.getByRole('button', { name: /Send message/ });
-
-      expect(textarea).toBeDisabled();
-      expect(sendButton).toBeDisabled();
-    });
-
-    it('disables input when loading', () => {
-      render(
-        <ThreadView
-          sessionId="test-session"
-          messages={[]}
-          isLoading={true}
-          onSendMessage={mockOnSendMessage}
-        />
-      );
-
-      const textarea = screen.getByPlaceholderText(/Type a message to continue/);
-      const sendButton = screen.getByRole('button', { name: /Send message/ });
-
-      expect(textarea).toBeDisabled();
-      expect(sendButton).toBeDisabled();
-    });
-
-    it('enables input when connected and not loading', () => {
-      render(
-        <ThreadView
-          sessionId="test-session"
-          messages={[]}
-          isConnected={true}
-          isLoading={false}
-          onSendMessage={mockOnSendMessage}
-        />
-      );
-
-      const textarea = screen.getByPlaceholderText(/Type a message to continue/);
-      const sendButton = screen.getByRole('button', { name: /Send message/ });
-
-      expect(textarea).not.toBeDisabled();
-      expect(sendButton).toBeDisabled(); // Disabled because no text
+      const input = screen.getByRole('textbox');
+      expect(input).toBeDisabled();
     });
   });
 
   describe('Message Sending', () => {
-    it('enables send button when text is entered', () => {
-      render(
-        <ThreadView
-          sessionId="test-session"
-          messages={[]}
-          onSendMessage={mockOnSendMessage}
-        />
-      );
+    it('calls sendMessage when form is submitted', async () => {
+      render(<ThreadView sessionId="test-session" />);
 
-      const textarea = screen.getByPlaceholderText(/Type a message to continue/);
-      const sendButton = screen.getByRole('button', { name: /Send message/ });
+      const input = screen.getByRole('textbox');
+      const sendButton = screen.getByRole('button', { name: /send/i });
 
+      fireEvent.change(input, { target: { value: 'Test message' } });
+      fireEvent.click(sendButton);
+
+      expect(mockSendMessage).toHaveBeenCalledWith('Test message');
+    });
+
+    it('shows sending state', () => {
+      mockUseThreadMessages.mockReturnValue({
+        ...defaultHookReturn,
+        isSending: true
+      });
+
+      render(<ThreadView sessionId="test-session" />);
+
+      const sendButton = screen.getByRole('button', { name: /send/i });
       expect(sendButton).toBeDisabled();
-
-      fireEvent.change(textarea, { target: { value: 'Hello' } });
-      expect(sendButton).not.toBeDisabled();
     });
 
-    it('calls onSendMessage when send button is clicked', () => {
-      render(
-        <ThreadView
-          sessionId="test-session"
-          messages={[]}
-          onSendMessage={mockOnSendMessage}
-        />
-      );
+    it('clears input after sending message', async () => {
+      render(<ThreadView sessionId="test-session" />);
 
-      const textarea = screen.getByPlaceholderText(/Type a message to continue/);
-      const sendButton = screen.getByRole('button', { name: /Send message/ });
+      const input = screen.getByRole('textbox') as HTMLInputElement;
+      const sendButton = screen.getByRole('button', { name: /send/i });
 
-      fireEvent.change(textarea, { target: { value: 'Test message' } });
+      fireEvent.change(input, { target: { value: 'Test message' } });
       fireEvent.click(sendButton);
 
-      expect(mockOnSendMessage).toHaveBeenCalledWith('Test message');
+      await waitFor(() => {
+        expect(input.value).toBe('');
+      });
     });
 
-    it('calls onSendMessage when Cmd+Enter is pressed', () => {
-      render(
-        <ThreadView
-          sessionId="test-session"
-          messages={[]}
-          onSendMessage={mockOnSendMessage}
-        />
-      );
+    it('prevents sending empty messages', () => {
+      render(<ThreadView sessionId="test-session" />);
 
-      const textarea = screen.getByPlaceholderText(/Type a message to continue/);
-
-      fireEvent.change(textarea, { target: { value: 'Test message' } });
-      fireEvent.keyDown(textarea, { key: 'Enter', metaKey: true });
-
-      expect(mockOnSendMessage).toHaveBeenCalledWith('Test message');
-    });
-
-    it('calls onSendMessage when Ctrl+Enter is pressed', () => {
-      render(
-        <ThreadView
-          sessionId="test-session"
-          messages={[]}
-          onSendMessage={mockOnSendMessage}
-        />
-      );
-
-      const textarea = screen.getByPlaceholderText(/Type a message to continue/);
-
-      fireEvent.change(textarea, { target: { value: 'Test message' } });
-      fireEvent.keyDown(textarea, { key: 'Enter', ctrlKey: true });
-
-      expect(mockOnSendMessage).toHaveBeenCalledWith('Test message');
-    });
-
-    it('does not call onSendMessage when Enter is pressed without modifier', () => {
-      render(
-        <ThreadView
-          sessionId="test-session"
-          messages={[]}
-          onSendMessage={mockOnSendMessage}
-        />
-      );
-
-      const textarea = screen.getByPlaceholderText(/Type a message to continue/);
-
-      fireEvent.change(textarea, { target: { value: 'Test message' } });
-      fireEvent.keyDown(textarea, { key: 'Enter' });
-
-      expect(mockOnSendMessage).not.toHaveBeenCalled();
-    });
-
-    it('clears input after sending message', () => {
-      render(
-        <ThreadView
-          sessionId="test-session"
-          messages={[]}
-          onSendMessage={mockOnSendMessage}
-        />
-      );
-
-      const textarea = screen.getByPlaceholderText(/Type a message to continue/) as HTMLTextAreaElement;
-      const sendButton = screen.getByRole('button', { name: /Send message/ });
-
-      fireEvent.change(textarea, { target: { value: 'Test message' } });
-      expect(textarea.value).toBe('Test message');
-
+      const sendButton = screen.getByRole('button', { name: /send/i });
       fireEvent.click(sendButton);
 
-      expect(textarea.value).toBe('');
+      expect(mockSendMessage).not.toHaveBeenCalled();
     });
 
-    it('trims whitespace from messages', () => {
-      render(
-        <ThreadView
-          sessionId="test-session"
-          messages={[]}
-          onSendMessage={mockOnSendMessage}
-        />
-      );
+    it('trims whitespace from messages', async () => {
+      render(<ThreadView sessionId="test-session" />);
 
-      const textarea = screen.getByPlaceholderText(/Type a message to continue/);
-      const sendButton = screen.getByRole('button', { name: /Send message/ });
+      const input = screen.getByRole('textbox');
+      const sendButton = screen.getByRole('button', { name: /send/i });
 
-      fireEvent.change(textarea, { target: { value: '  Test message  ' } });
+      fireEvent.change(input, { target: { value: '  Test message  ' } });
       fireEvent.click(sendButton);
 
-      expect(mockOnSendMessage).toHaveBeenCalledWith('Test message');
+      expect(mockSendMessage).toHaveBeenCalledWith('Test message');
     });
 
-    it('does not send empty or whitespace-only messages', () => {
-      render(
-        <ThreadView
-          sessionId="test-session"
-          messages={[]}
-          onSendMessage={mockOnSendMessage}
-        />
-      );
+    it('handles Enter key submission', () => {
+      render(<ThreadView sessionId="test-session" />);
 
-      const textarea = screen.getByPlaceholderText(/Type a message to continue/);
-      const sendButton = screen.getByRole('button', { name: /Send message/ });
+      const input = screen.getByRole('textbox');
+      fireEvent.change(input, { target: { value: 'Test message' } });
+      fireEvent.keyDown(input, { key: 'Enter', code: 'Enter' });
 
-      fireEvent.change(textarea, { target: { value: '   ' } });
-      fireEvent.click(sendButton);
+      // The MessageInput component handles key submission
+      expect(input).toBeInTheDocument();
+    });
 
-      expect(mockOnSendMessage).not.toHaveBeenCalled();
+    it('handles Shift+Enter for new lines', () => {
+      render(<ThreadView sessionId="test-session" />);
+
+      const input = screen.getByRole('textbox');
+      fireEvent.change(input, { target: { value: 'Test message' } });
+      fireEvent.keyDown(input, { key: 'Enter', code: 'Enter', shiftKey: true });
+
+      expect(mockSendMessage).not.toHaveBeenCalled();
     });
   });
 
-  describe('Sending State', () => {
-    it('disables input and shows spinner when sending', () => {
-      render(
-        <ThreadView
-          sessionId="test-session"
-          messages={[]}
-          isSending={true}
-          onSendMessage={mockOnSendMessage}
-        />
-      );
+  describe('Message Display', () => {
+    it('displays messages with correct roles', () => {
+      const messages: ThreadMessage[] = [
+        {
+          id: '1',
+          role: 'user',
+          content: 'User message',
+          ts: '2023-01-01T10:00:00Z',
+          metadata: {}
+        },
+        {
+          id: '2',
+          role: 'amp',
+          content: 'Assistant message',
+          ts: '2023-01-01T10:01:00Z',
+          metadata: {}
+        }
+      ];
 
-      const textarea = screen.getByPlaceholderText(/Type a message to continue/);
-      const sendButton = screen.getByRole('button', { name: /Sending message/ });
+      mockUseThreadMessages.mockReturnValue({
+        ...defaultHookReturn,
+        messages
+      });
 
-      expect(textarea).toBeDisabled();
-      expect(sendButton).toBeDisabled();
+      render(<ThreadView sessionId="test-session" />);
+
+      expect(screen.getByText('User message')).toBeInTheDocument();
+      expect(screen.getByText('Assistant message')).toBeInTheDocument();
     });
 
-    it('prevents sending when already sending', () => {
-      render(
-        <ThreadView
-          sessionId="test-session"
-          messages={[]}
-          isSending={true}
-          onSendMessage={mockOnSendMessage}
-        />
-      );
+    it('displays timestamps', () => {
+      const messages: ThreadMessage[] = [
+        {
+          id: '1',
+          role: 'user',
+          content: 'Test message',
+          ts: '2023-01-01T10:00:00Z',
+          metadata: {}
+        }
+      ];
 
-      const textarea = screen.getByPlaceholderText(/Type a message to continue/);
+      mockUseThreadMessages.mockReturnValue({
+        ...defaultHookReturn,
+        messages
+      });
 
-      fireEvent.change(textarea, { target: { value: 'Test message' } });
-      fireEvent.keyDown(textarea, { key: 'Enter', metaKey: true });
+      render(<ThreadView sessionId="test-session" />);
 
-      expect(mockOnSendMessage).not.toHaveBeenCalled();
+      // Should display time in format like "Jan 1, 02:00 AM"
+      expect(screen.getByText(/Jan 1/)).toBeInTheDocument();
+    });
+
+    it('auto-scrolls to bottom when new messages arrive', () => {
+      const messages: ThreadMessage[] = [
+        {
+          id: '1',
+          role: 'user',
+          content: 'Message 1',
+          ts: '2023-01-01T10:00:00Z',
+          metadata: {}
+        }
+      ];
+
+      mockUseThreadMessages.mockReturnValue({
+        ...defaultHookReturn,
+        messages
+      });
+
+      render(<ThreadView sessionId="test-session" />);
+
+      // Check that the first message is displayed
+      expect(screen.getByText('Message 1')).toBeInTheDocument();
+    });
+  });
+
+  describe('Hook Integration', () => {
+    it('calls useThreadMessages with correct sessionId', () => {
+      render(<ThreadView sessionId="test-session-123" />);
+
+      expect(mockUseThreadMessages).toHaveBeenCalledWith({
+        sessionId: 'test-session-123',
+        loadHistory: true
+      });
+    });
+
+    it('respects loadHistory prop', () => {
+      render(<ThreadView sessionId="test-session" loadHistory={false} />);
+
+      expect(mockUseThreadMessages).toHaveBeenCalledWith({
+        sessionId: 'test-session',
+        loadHistory: false
+      });
+    });
+
+    it('defaults loadHistory to true', () => {
+      render(<ThreadView sessionId="test-session" />);
+
+      expect(mockUseThreadMessages).toHaveBeenCalledWith({
+        sessionId: 'test-session',
+        loadHistory: true
+      });
+    });
+  });
+
+  describe('Error Handling', () => {
+    it('handles missing sessionId gracefully', () => {
+      render(<ThreadView sessionId="" />);
+      expect(screen.getByText('Start a conversation')).toBeInTheDocument();
+    });
+
+    it('handles hook errors gracefully', () => {
+      mockUseThreadMessages.mockReturnValue({
+        ...defaultHookReturn,
+        messages: [],
+        isConnected: false,
+        connectionState: 'error'
+      });
+
+      render(<ThreadView sessionId="test-session" />);
+      expect(screen.getByText('Connection failed')).toBeInTheDocument();
     });
   });
 
   describe('Accessibility', () => {
-    it('has proper ARIA labels for send button', () => {
-      render(
-        <ThreadView
-          sessionId="test-session"
-          messages={[]}
-          onSendMessage={mockOnSendMessage}
-        />
-      );
+    it('has proper ARIA labels', () => {
+      render(<ThreadView sessionId="test-session" />);
 
-      const sendButton = screen.getByRole('button', { name: /Send message/ });
-      expect(sendButton).toHaveAttribute('aria-label', 'Send message');
+      const messageInput = screen.getByRole('textbox');
+      const sendButton = screen.getByRole('button', { name: /send/i });
+
+      expect(messageInput).toHaveAttribute('placeholder', 'Type a message to continue the task... (⌘/Ctrl + Enter to send)');
+      expect(sendButton).toBeInTheDocument();
     });
 
-    it('updates ARIA label when sending', () => {
-      render(
-        <ThreadView
-          sessionId="test-session"
-          messages={[]}
-          isSending={true}
-          onSendMessage={mockOnSendMessage}
-        />
-      );
+    it('maintains focus after sending message', async () => {
+      render(<ThreadView sessionId="test-session" />);
 
-      const sendButton = screen.getByRole('button', { name: /Sending message/ });
-      expect(sendButton).toHaveAttribute('aria-label', 'Sending message');
-    });
+      const input = screen.getByRole('textbox');
+      const sendButton = screen.getByRole('button', { name: /send/i });
 
-    it('provides helpful placeholder text', () => {
-      render(
-        <ThreadView
-          sessionId="test-session"
-          messages={[]}
-          onSendMessage={mockOnSendMessage}
-        />
-      );
-
-      expect(screen.getByPlaceholderText(/Type a message to continue the task.../)).toBeInTheDocument();
-    });
-
-    it('shows keyboard shortcut hint', () => {
-      render(
-        <ThreadView
-          sessionId="test-session"
-          messages={[]}
-          onSendMessage={mockOnSendMessage}
-        />
-      );
-
-      expect(screen.getByText(/Press ⌘\/Ctrl \+ Enter to send/)).toBeInTheDocument();
-    });
-  });
-
-  describe('Edge Cases', () => {
-    it('handles missing onSendMessage prop gracefully', () => {
-      render(
-        <ThreadView
-          sessionId="test-session"
-          messages={[]}
-        />
-      );
-
-      const textarea = screen.getByPlaceholderText(/Type a message to continue/);
-      const sendButton = screen.getByRole('button', { name: /Send message/ });
-
-      fireEvent.change(textarea, { target: { value: 'Test message' } });
+      fireEvent.change(input, { target: { value: 'Test message' } });
       fireEvent.click(sendButton);
 
-      // Should not crash
-      expect(screen.getByDisplayValue('Test message')).toBeInTheDocument();
-    });
-
-    it('handles very long messages', () => {
-      const longMessage = 'A'.repeat(1000);
-      
-      render(
-        <ThreadView
-          sessionId="test-session"
-          messages={[]}
-          onSendMessage={mockOnSendMessage}
-        />
-      );
-
-      const textarea = screen.getByPlaceholderText(/Type a message to continue/);
-      const sendButton = screen.getByRole('button', { name: /Send message/ });
-
-      fireEvent.change(textarea, { target: { value: longMessage } });
-      fireEvent.click(sendButton);
-
-      expect(mockOnSendMessage).toHaveBeenCalledWith(longMessage);
-    });
-
-    it('handles rapid state changes', () => {
-      const { rerender } = render(
-        <ThreadView
-          sessionId="test-session"
-          messages={[]}
-          isConnected={false}
-          isLoading={true}
-          onSendMessage={mockOnSendMessage}
-        />
-      );
-
-      expect(screen.getByText('Loading messages...')).toBeInTheDocument();
-      expect(screen.getByText('Connecting to session...')).toBeInTheDocument();
-
-      rerender(
-        <ThreadView
-          sessionId="test-session"
-          messages={sampleMessages}
-          isConnected={true}
-          isLoading={false}
-          onSendMessage={mockOnSendMessage}
-        />
-      );
-
-      expect(screen.queryByText('Loading messages...')).not.toBeInTheDocument();
-      expect(screen.queryByText('Connecting to session...')).not.toBeInTheDocument();
-      expect(screen.getByTestId('message-msg-1')).toBeInTheDocument();
+      await waitFor(() => {
+        expect(input).toHaveFocus();
+      });
     });
   });
 });

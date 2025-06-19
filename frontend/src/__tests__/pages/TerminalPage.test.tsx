@@ -21,6 +21,14 @@ vi.mock('../../components/task/ThreadView', () => ({
   )
 }));
 
+vi.mock('../../components/task/GitDiff', () => ({
+  default: ({ sessionId, className }: { sessionId: string; className?: string }) => (
+    <div data-testid="git-diff" className={className}>
+      GitDiff Component - Session: {sessionId}
+    </div>
+  )
+}));
+
 vi.mock('../../components/task/TaskTabs', () => ({
   default: ({ activeTab, onTabChange, className }: any) => (
     <div data-testid="task-tabs" className={className}>
@@ -143,14 +151,15 @@ describe('TerminalPage', () => {
       });
     });
 
-    it('navigates to diff page when git diff tab is clicked', async () => {
+    it('switches to git diff tab when clicked', async () => {
       renderWithRouter(<TerminalPage />);
       
       const gitDiffTab = screen.getByTestId('gitdiff-tab');
       fireEvent.click(gitDiffTab);
       
       await waitFor(() => {
-        expect(mockNavigate).toHaveBeenCalledWith('/diff/test-session-123');
+        expect(gitDiffTab).toHaveAttribute('aria-selected', 'true');
+        expect(screen.getByTestId('git-diff')).toBeInTheDocument();
       });
     });
   });
@@ -175,7 +184,19 @@ describe('TerminalPage', () => {
       });
     });
 
-    it('passes correct session ID to both components', async () => {
+    it('renders git diff when git diff tab is active', async () => {
+      renderWithRouter(<TerminalPage />);
+      
+      const gitDiffTab = screen.getByTestId('gitdiff-tab');
+      fireEvent.click(gitDiffTab);
+      
+      await waitFor(() => {
+        expect(screen.getByTestId('git-diff')).toBeInTheDocument();
+        expect(screen.getByText(/gitdiff component - session: test-session-123/i)).toBeInTheDocument();
+      });
+    });
+
+    it('passes correct session ID to all components', async () => {
       renderWithRouter(<TerminalPage />);
       
       // Check terminal
@@ -187,6 +208,14 @@ describe('TerminalPage', () => {
       
       await waitFor(() => {
         expect(screen.getByText(/threadview component - session: test-session-123/i)).toBeInTheDocument();
+      });
+
+      // Switch to git diff and check
+      const gitDiffTab = screen.getByTestId('gitdiff-tab');
+      fireEvent.click(gitDiffTab);
+      
+      await waitFor(() => {
+        expect(screen.getByText(/gitdiff component - session: test-session-123/i)).toBeInTheDocument();
       });
     });
   });
@@ -204,6 +233,14 @@ describe('TerminalPage', () => {
       
       await waitFor(() => {
         expect(screen.getByText('conversation')).toBeInTheDocument();
+      });
+
+      // Switch to git diff
+      const gitDiffTab = screen.getByTestId('gitdiff-tab');
+      fireEvent.click(gitDiffTab);
+      
+      await waitFor(() => {
+        expect(screen.getByText('git diff')).toBeInTheDocument();
       });
     });
 
@@ -306,9 +343,11 @@ describe('TerminalPage', () => {
       
       const threadTab = screen.getByTestId('thread-tab');
       const terminalTab = screen.getByTestId('terminal-tab');
+      const gitDiffTab = screen.getByTestId('gitdiff-tab');
       
       // Rapidly switch tabs
       fireEvent.click(threadTab);
+      fireEvent.click(gitDiffTab);
       fireEvent.click(terminalTab);
       fireEvent.click(threadTab);
       

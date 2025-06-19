@@ -1,8 +1,6 @@
-import React from 'react';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import ThreadView from '../../components/task/ThreadView';
-import { ThreadMessage } from '../../types/threadMessage';
 import { ConnectionState } from '../../services/threadWebSocket';
 
 // Mock WebSocket
@@ -89,10 +87,10 @@ const mockFetch = vi.fn();
 // Setup mocks
 beforeEach(() => {
   // Mock WebSocket
-  global.WebSocket = MockWebSocket as any;
+  (globalThis as any).WebSocket = MockWebSocket as any;
   
   // Mock fetch
-  global.fetch = mockFetch;
+  (globalThis as any).fetch = mockFetch;
   
   // Mock history response
   mockFetch.mockResolvedValue({
@@ -120,7 +118,7 @@ describe('ThreadView Data Flow Integration', () => {
 
     await waitFor(() => {
       expect(MockWebSocket.instances).toHaveLength(1);
-      expect(MockWebSocket.instances[0].url).toBe(`ws://localhost:3001/ws/thread/${mockSessionId}`);
+      expect(MockWebSocket.instances[0]?.url).toBe(`ws://localhost:3001/ws/thread/${mockSessionId}`);
     });
   });
 

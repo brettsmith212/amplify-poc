@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import Terminal from '../components/Terminal';
 import ThreadView from '../components/task/ThreadView';
+import GitDiff from '../components/task/GitDiff';
 import TaskTabs from '../components/task/TaskTabs';
 import { TabType } from '../types/tabs';
 
@@ -17,10 +18,6 @@ const TerminalPage = () => {
   };
 
   const handleTabChange = (tab: TabType) => {
-    if (tab === 'gitdiff') {
-      handleViewDiff();
-      return;
-    }
     setActiveTab(tab);
   };
 
@@ -70,6 +67,16 @@ const TerminalPage = () => {
             }}
             onResize={(_dimensions) => {
               // Terminal resized
+            }}
+          />
+        );
+      case 'gitdiff':
+        return (
+          <GitDiff 
+            sessionId={sessionId}
+            className="h-full"
+            onError={(error) => {
+              console.error('Git diff error:', error);
             }}
           />
         );

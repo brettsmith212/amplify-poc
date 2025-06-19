@@ -1,5 +1,4 @@
 import React from 'react';
-import { ThreadMessage } from '../../types/threadMessage';
 import MessageBubble from './MessageBubble';
 import MessageInput from './MessageInput';
 import useAutoScroll from '../../hooks/useAutoScroll';
@@ -160,7 +159,7 @@ export const ThreadView: React.FC<ThreadViewProps> = ({
   } = useThreadMessages({
     sessionId,
     loadHistory,
-    apiBaseUrl
+    ...(apiBaseUrl && { apiBaseUrl })
   });
 
   const { scrollRef } = useAutoScroll({

@@ -144,7 +144,7 @@ export const useThreadMessages = (options: UseThreadMessagesOptions): UseThreadM
         throw new Error(`Failed to load thread history: ${response.status} ${response.statusText}`);
       }
 
-      const data = await response.json();
+      await response.json();
       
       // The messages are already being handled by the WebSocket hook
       // This is mainly for loading historical messages when the component mounts
