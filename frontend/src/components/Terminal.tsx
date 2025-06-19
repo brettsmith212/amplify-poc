@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useCallback } from 'react';
 import { useTerminal } from '../hooks/useTerminal';
-import { useWebSocket } from '../hooks/useWebSocket';
-import { TerminalMessage, TerminalProps } from '../types/terminal';
+import { useTerminalWebSocket } from '../hooks/useTerminalWebSocket';
+import { TerminalProps } from '../types/terminal';
 import '@xterm/xterm/css/xterm.css';
 
 const Terminal: React.FC<TerminalProps> = ({
@@ -12,90 +12,93 @@ const Terminal: React.FC<TerminalProps> = ({
   onResize
 }) => {
   const terminalRef = useRef<HTMLDivElement>(null);
-  const sendMessageRef = useRef<((message: TerminalMessage) => void) | null>(null);
 
   // Create refs for terminal functions that will be available later
   const writeRef = useRef<((data: string) => void) | null>(null);
   const writelnRef = useRef<((data: string) => void) | null>(null);
 
-  // WebSocket hook for server communication with optional session support
-  const wsUrl = sessionId 
-    ? `ws://localhost:3000/ws/${sessionId}`
-    : `ws://localhost:3000/ws`;
-  
-  const { isConnected, error, sendMessage } = useWebSocket(
-    wsUrl,
-    {
-      onMessage: useCallback((message: TerminalMessage) => {
-        switch (message.type) {
-          case 'output':
-            if (typeof message.data === 'string' && writeRef.current) {
-              writeRef.current(message.data);
-            }
-            break;
-          case 'control':
-            // Handle control signals if needed
-            break;
-        }
-      }, []),
-      onConnect: useCallback(() => {
-        console.log('WebSocket connected');
-        if (writelnRef.current) {
-          writelnRef.current('\r\n\x1b[32m● Connected to container terminal\x1b[0m\r\n');
-        }
-      }, []),
-      onDisconnect: useCallback(() => {
-        console.log('WebSocket disconnected');
-        if (writelnRef.current) {
-          writelnRef.current('\r\n\x1b[31m● Disconnected from container terminal\x1b[0m\r\n');
-        }
-      }, []),
-      onError: useCallback((error) => {
-        console.error('WebSocket error:', error);
-        if (writelnRef.current) {
-          writelnRef.current(`\r\n\x1b[31m● Connection error\x1b[0m\r\n`);
-        }
-      }, [])
-    }
-  );
+  // Terminal WebSocket connection
+  const {
+    isConnected,
+    error,
+    sendInput,
+    sendResize,
+    sendControlSignal,
+    onOutput,
+    onConnect,
+    onDisconnect,
+    onError
+  } = useTerminalWebSocket(sessionId, {
+    config: {
+      baseUrl: 'ws://localhost:3000',
+      autoReconnect: true,
+      maxReconnectAttempts: 3,
+      reconnectDelay: 1000
+    },
+    autoConnect: true,
+    autoDisconnect: true
+  });
 
-  // Store sendMessage in ref for use in terminal hook
+  // Set up WebSocket event handlers
   useEffect(() => {
-    sendMessageRef.current = sendMessage;
-  }, [sendMessage]);
+    const unsubscribeOutput = onOutput((data: string) => {
+      if (writeRef.current) {
+        writeRef.current(data);
+      }
+    });
+
+    const unsubscribeConnect = onConnect(() => {
+      console.log('Terminal WebSocket connected');
+      if (writelnRef.current) {
+        writelnRef.current('\r\n\x1b[32m● Connected to container terminal\x1b[0m\r\n');
+      }
+    });
+
+    const unsubscribeDisconnect = onDisconnect(() => {
+      console.log('Terminal WebSocket disconnected');
+      if (writelnRef.current) {
+        writelnRef.current('\r\n\x1b[31m● Disconnected from container terminal\x1b[0m\r\n');
+      }
+    });
+
+    const unsubscribeError = onError((error: Error) => {
+      console.error('Terminal WebSocket error:', error);
+      if (writelnRef.current) {
+        writelnRef.current(`\r\n\x1b[31m● Connection error: ${error.message}\x1b[0m\r\n`);
+      }
+    });
+
+    return () => {
+      unsubscribeOutput();
+      unsubscribeConnect();
+      unsubscribeDisconnect();
+      unsubscribeError();
+    };
+  }, [onOutput, onConnect, onDisconnect, onError]);
 
   // Stable callback functions
   const handleData = useCallback((data: string) => {
     // Send terminal input to WebSocket
-    sendMessageRef.current?.({
-      type: 'input',
-      data,
-      timestamp: Date.now()
-    });
+    sendInput(data);
     onData?.(data);
-  }, [onData]);
+  }, [sendInput, onData]);
 
   const handleResize = useCallback((resizeData: any) => {
     // Send resize event to WebSocket
-    sendMessageRef.current?.({
-      type: 'resize',
-      data: resizeData,
-      timestamp: Date.now()
-    });
+    if (resizeData && typeof resizeData.cols === 'number' && typeof resizeData.rows === 'number') {
+      sendResize(resizeData.cols, resizeData.rows);
+    }
     onResize?.(resizeData);
-  }, [onResize]);
+  }, [sendResize, onResize]);
 
   const handleControlKey = useCallback((key: string, event: KeyboardEvent) => {
     // Handle control key combinations
     if (['SIGINT', 'SIGTERM', 'SIGTSTP', 'SIGQUIT'].includes(key)) {
       event.preventDefault();
-      sendMessageRef.current?.({
-        type: 'control',
-        data: { signal: key as any },
-        timestamp: Date.now()
-      });
+      // Send control signal to WebSocket
+      sendControlSignal(key as any);
     }
-  }, []);
+  }, [sendControlSignal]);
 
   // Terminal hook for xterm.js management
   const {
@@ -128,17 +131,19 @@ const Terminal: React.FC<TerminalProps> = ({
     }
   }, [terminalReady, terminal, focus, onReady]);
 
-  // Connection status effect
+  // Connection status effect - send resize with delay to ensure connection is stable
   useEffect(() => {
-    if (isConnected && terminalReady && writelnRef.current && dimensions) {
-      // Send initial resize to sync terminal dimensions
-      sendMessage({
-        type: 'resize',
-        data: dimensions,
-        timestamp: Date.now()
-      });
+    if (isConnected && terminalReady && dimensions) {
+      // Small delay to ensure WebSocket is fully ready
+      const timer = setTimeout(() => {
+        sendResize(dimensions.cols, dimensions.rows);
+      }, 100);
+      
+      return () => clearTimeout(timer);
     }
-  }, [isConnected, terminalReady, dimensions, sendMessage]);
+    
+    return undefined;
+  }, [isConnected, terminalReady, dimensions, sendResize]);
 
   return (
     <div className={`terminal-container h-full flex flex-col ${className}`}>
@@ -165,7 +170,7 @@ const Terminal: React.FC<TerminalProps> = ({
               <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd"></path>
             </svg>
             <span className="font-semibold">Connection Error:</span>
-            <span>{error}</span>
+            <span>{String(error)}</span>
           </div>
         </div>
       )}

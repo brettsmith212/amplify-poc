@@ -1,160 +1,334 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { WebSocketHookState, TerminalMessage } from '../types/terminal';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { ThreadWebSocketClient, ConnectionState, ThreadWebSocketConfig, ThreadWebSocketCallbacks } from '../services/threadWebSocket';
+import { ThreadMessage } from '../types/threadMessage';
 
-interface UseWebSocketOptions {
-  onMessage?: (message: TerminalMessage) => void;
-  onConnect?: () => void;
-  onDisconnect?: () => void;
-  onError?: (error: Event) => void;
-  reconnectAttempts?: number;
-  reconnectInterval?: number;
+export interface UseWebSocketOptions {
+  /**
+   * WebSocket configuration options
+   */
+  config?: ThreadWebSocketConfig;
+  
+  /**
+   * Whether to automatically connect when the hook mounts
+   */
+  autoConnect?: boolean;
+  
+  /**
+   * Whether to automatically disconnect when the hook unmounts
+   */
+  autoDisconnect?: boolean;
+  
+  /**
+   * Whether to store messages in the hook state
+   */
+  storeMessages?: boolean;
+  
+  /**
+   * Maximum number of messages to store (if storeMessages is true)
+   */
+  maxStoredMessages?: number;
 }
 
+export interface UseWebSocketReturn {
+  /**
+   * Current connection state
+   */
+  connectionState: ConnectionState;
+  
+  /**
+   * Whether the WebSocket is connected
+   */
+  isConnected: boolean;
+  
+  /**
+   * Messages received from the WebSocket (if storeMessages is enabled)
+   */
+  messages: ThreadMessage[];
+  
+  /**
+   * Last error that occurred
+   */
+  error: Error | null;
+  
+  /**
+   * Whether a message is currently being sent
+   */
+  isSending: boolean;
+  
+  /**
+   * Connect to the WebSocket
+   */
+  connect: () => void;
+  
+  /**
+   * Disconnect from the WebSocket
+   */
+  disconnect: () => void;
+  
+  /**
+   * Send a message through the WebSocket
+   */
+  sendMessage: (content: string) => Promise<boolean>;
+  
+  /**
+   * Clear stored messages
+   */
+  clearMessages: () => void;
+  
+  /**
+   * Clear error state
+   */
+  clearError: () => void;
+  
+  /**
+   * Add a callback for message events
+   */
+  onMessage: (callback: (message: ThreadMessage) => void) => void;
+  
+  /**
+   * Add a callback for connection state changes
+   */
+  onConnectionChange: (callback: (state: ConnectionState) => void) => void;
+  
+  /**
+   * Add a callback for errors
+   */
+  onError: (callback: (error: Error) => void) => void;
+}
+
+/**
+ * React hook for managing WebSocket connections to thread endpoints
+ */
 export const useWebSocket = (
-  url: string,
+  sessionId: string,
   options: UseWebSocketOptions = {}
-) => {
+): UseWebSocketReturn => {
   const {
-    onMessage,
-    onConnect,
-    onDisconnect,
-    onError,
-    reconnectAttempts = 5,
-    reconnectInterval = 2000
+    config = {},
+    autoConnect = true,
+    autoDisconnect = true,
+    storeMessages = true,
+    maxStoredMessages = 1000
   } = options;
 
-  const [state, setState] = useState<WebSocketHookState>({
-    socket: null,
-    isConnected: false,
-    error: null,
-    reconnectAttempts: 0
-  });
+  // State
+  const [connectionState, setConnectionState] = useState<ConnectionState>(ConnectionState.DISCONNECTED);
+  const [messages, setMessages] = useState<ThreadMessage[]>([]);
+  const [error, setError] = useState<Error | null>(null);
+  const [isSending, setIsSending] = useState(false);
 
-  const reconnectTimeoutRef = useRef<number>();
-  const shouldReconnectRef = useRef(true);
-  
-  // Store callbacks in refs to prevent recreating connect function
-  const onMessageRef = useRef(onMessage);
-  const onConnectRef = useRef(onConnect);
-  const onDisconnectRef = useRef(onDisconnect);
-  const onErrorRef = useRef(onError);
+  // Refs
+  const clientRef = useRef<ThreadWebSocketClient | null>(null);
+  const messageCallbacksRef = useRef<Set<(message: ThreadMessage) => void>>(new Set());
+  const connectionCallbacksRef = useRef<Set<(state: ConnectionState) => void>>(new Set());
+  const errorCallbacksRef = useRef<Set<(error: Error) => void>>(new Set());
 
-  // Update refs when callbacks change
+  // Initialize WebSocket client
   useEffect(() => {
-    onMessageRef.current = onMessage;
-  }, [onMessage]);
-
-  useEffect(() => {
-    onConnectRef.current = onConnect;
-  }, [onConnect]);
-
-  useEffect(() => {
-    onDisconnectRef.current = onDisconnect;
-  }, [onDisconnect]);
-
-  useEffect(() => {
-    onErrorRef.current = onError;
-  }, [onError]);
-
-  const connect = useCallback(() => {
-    try {
-      const socket = new WebSocket(url);
-
-      socket.onopen = () => {
-        setState(prev => ({
-          ...prev,
-          socket,
-          isConnected: true,
-          error: null,
-          reconnectAttempts: 0
-        }));
-        onConnectRef.current?.();
-      };
-
-      socket.onmessage = (event) => {
-        try {
-          const message: TerminalMessage = JSON.parse(event.data);
-          onMessageRef.current?.(message);
-        } catch (error) {
-          console.error('Failed to parse WebSocket message:', error);
+    const callbacks: ThreadWebSocketCallbacks = {
+      onMessage: (message: ThreadMessage) => {
+        // Store message if enabled
+        if (storeMessages) {
+          setMessages(prev => {
+            const newMessages = [...prev, message];
+            // Limit stored messages
+            if (newMessages.length > maxStoredMessages) {
+              return newMessages.slice(-maxStoredMessages);
+            }
+            return newMessages;
+          });
         }
-      };
-
-      socket.onclose = () => {
-        setState(prev => {
-          const newState = {
-            ...prev,
-            socket: null,
-            isConnected: false
-          };
-          
-          onDisconnectRef.current?.();
-
-          // Attempt reconnection if enabled and within limits
-          if (shouldReconnectRef.current && prev.reconnectAttempts < reconnectAttempts) {
-            reconnectTimeoutRef.current = window.setTimeout(() => {
-              setState(prevInner => ({
-                ...prevInner,
-                reconnectAttempts: prevInner.reconnectAttempts + 1
-              }));
-              connect();
-            }, reconnectInterval);
+        
+        // Call registered callbacks
+        messageCallbacksRef.current.forEach(callback => {
+          try {
+            callback(message);
+          } catch (err) {
+            console.error('Error in message callback:', err);
           }
-          
-          return newState;
         });
-      };
-
-      socket.onerror = (error) => {
-        setState(prev => ({
-          ...prev,
-          error: 'WebSocket connection error'
-        }));
-        onErrorRef.current?.(error);
-      };
-
-    } catch (error) {
-      setState(prev => ({
-        ...prev,
-        error: error instanceof Error ? error.message : 'Failed to create WebSocket'
-      }));
-    }
-  }, [url, reconnectAttempts, reconnectInterval]);
-
-  const disconnect = useCallback(() => {
-    shouldReconnectRef.current = false;
-    if (reconnectTimeoutRef.current) {
-      window.clearTimeout(reconnectTimeoutRef.current);
-    }
-    if (state.socket) {
-      state.socket.close();
-    }
-  }, [state.socket]);
-
-  const sendMessage = useCallback((message: TerminalMessage) => {
-    if (state.socket && state.isConnected) {
-      state.socket.send(JSON.stringify(message));
-    }
-  }, [state.socket, state.isConnected]);
-
-  useEffect(() => {
-    connect();
-
-    return () => {
-      shouldReconnectRef.current = false;
-      if (reconnectTimeoutRef.current) {
-        window.clearTimeout(reconnectTimeoutRef.current);
-      }
-      if (state.socket) {
-        state.socket.close();
+      },
+      
+      onConnectionChange: (state: ConnectionState) => {
+        setConnectionState(state);
+        
+        // Clear error when successfully connected
+        if (state === ConnectionState.CONNECTED) {
+          setError(null);
+        }
+        
+        // Call registered callbacks
+        connectionCallbacksRef.current.forEach(callback => {
+          try {
+            callback(state);
+          } catch (err) {
+            console.error('Error in connection callback:', err);
+          }
+        });
+      },
+      
+      onError: (err: Error) => {
+        setError(err);
+        
+        // Call registered callbacks
+        errorCallbacksRef.current.forEach(callback => {
+          try {
+            callback(err);
+          } catch (error) {
+            console.error('Error in error callback:', error);
+          }
+        });
       }
     };
-  }, [connect]);
+
+    clientRef.current = new ThreadWebSocketClient(sessionId, config, callbacks);
+    
+    // Auto-connect if enabled
+    if (autoConnect) {
+      clientRef.current.connect();
+    }
+
+    // Cleanup on unmount
+    return () => {
+      if (clientRef.current && autoDisconnect) {
+        clientRef.current.disconnect();
+      }
+      clientRef.current = null;
+    };
+  }, [sessionId, autoConnect, autoDisconnect, storeMessages, maxStoredMessages]);
+
+  // Update client callbacks when config changes
+  useEffect(() => {
+    if (clientRef.current) {
+      const callbacks: ThreadWebSocketCallbacks = {
+        onMessage: (message: ThreadMessage) => {
+          if (storeMessages) {
+            setMessages(prev => {
+              const newMessages = [...prev, message];
+              if (newMessages.length > maxStoredMessages) {
+                return newMessages.slice(-maxStoredMessages);
+              }
+              return newMessages;
+            });
+          }
+          
+          messageCallbacksRef.current.forEach(callback => {
+            try {
+              callback(message);
+            } catch (err) {
+              console.error('Error in message callback:', err);
+            }
+          });
+        },
+        
+        onConnectionChange: (state: ConnectionState) => {
+          setConnectionState(state);
+          
+          if (state === ConnectionState.CONNECTED) {
+            setError(null);
+          }
+          
+          connectionCallbacksRef.current.forEach(callback => {
+            try {
+              callback(state);
+            } catch (err) {
+              console.error('Error in connection callback:', err);
+            }
+          });
+        },
+        
+        onError: (err: Error) => {
+          setError(err);
+          
+          errorCallbacksRef.current.forEach(callback => {
+            try {
+              callback(err);
+            } catch (error) {
+              console.error('Error in error callback:', error);
+            }
+          });
+        }
+      };
+      
+      clientRef.current.updateCallbacks(callbacks);
+    }
+  }, [storeMessages, maxStoredMessages]);
+
+  // Callback functions
+  const connect = useCallback(() => {
+    clientRef.current?.connect();
+  }, []);
+
+  const disconnect = useCallback(() => {
+    clientRef.current?.disconnect();
+  }, []);
+
+  const sendMessage = useCallback(async (content: string): Promise<boolean> => {
+    if (!clientRef.current) {
+      setError(new Error('WebSocket client not initialized'));
+      return false;
+    }
+
+    setIsSending(true);
+    
+    try {
+      const success = clientRef.current.sendMessage(content);
+      return success;
+    } finally {
+      setIsSending(false);
+    }
+  }, []);
+
+  const clearMessages = useCallback(() => {
+    setMessages([]);
+  }, []);
+
+  const clearError = useCallback(() => {
+    setError(null);
+  }, []);
+
+  const onMessage = useCallback((callback: (message: ThreadMessage) => void) => {
+    messageCallbacksRef.current.add(callback);
+    
+    // Return cleanup function
+    return () => {
+      messageCallbacksRef.current.delete(callback);
+    };
+  }, []);
+
+  const onConnectionChange = useCallback((callback: (state: ConnectionState) => void) => {
+    connectionCallbacksRef.current.add(callback);
+    
+    // Return cleanup function
+    return () => {
+      connectionCallbacksRef.current.delete(callback);
+    };
+  }, []);
+
+  const onError = useCallback((callback: (error: Error) => void) => {
+    errorCallbacksRef.current.add(callback);
+    
+    // Return cleanup function
+    return () => {
+      errorCallbacksRef.current.delete(callback);
+    };
+  }, []);
 
   return {
-    ...state,
+    connectionState,
+    isConnected: connectionState === ConnectionState.CONNECTED,
+    messages,
+    error,
+    isSending,
     connect,
     disconnect,
-    sendMessage
+    sendMessage,
+    clearMessages,
+    clearError,
+    onMessage,
+    onConnectionChange,
+    onError
   };
 };
+
+export default useWebSocket;

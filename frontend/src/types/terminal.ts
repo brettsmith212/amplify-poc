@@ -10,7 +10,7 @@ export interface ResizeData {
 }
 
 export interface ControlData {
-  signal: 'SIGINT' | 'SIGTERM' | 'SIGKILL';
+  signal: 'SIGINT' | 'SIGTERM' | 'SIGKILL' | 'SIGTSTP' | 'SIGCONT' | 'SIGQUIT';
 }
 
 export interface WebSocketHookState {
