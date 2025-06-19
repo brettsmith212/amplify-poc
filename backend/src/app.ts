@@ -169,7 +169,8 @@ export class WebApp {
         sessions: sessionStats,
         cleanup: cleanupStats,
         threadWebSockets: threadWebSocketStats,
-        uptime: process.uptime()
+        uptime: process.uptime(),
+        devRoutesEnabled: webConfig.development.isDevelopment
       });
     });
 
@@ -213,7 +214,10 @@ export class WebApp {
     
     // Development thread routes (no authentication required)
     if (webConfig.development.isDevelopment) {
+      appLogger.info('Mounting development thread routes at /api/dev/thread');
       this.app.use('/api/dev/thread', devThreadRoutes);
+    } else {
+      appLogger.info('Development mode disabled, skipping dev routes');
     }
 
     appLogger.info('Routes configured');

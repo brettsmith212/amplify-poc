@@ -41,22 +41,10 @@ export async function createDevSession(): Promise<DevSessionData> {
  * Stores the session info in localStorage for reuse
  */
 export async function getOrCreateDevSession(): Promise<DevSessionData> {
-  // Check if we have a stored dev session
-  const stored = localStorage.getItem('dev-session');
-  if (stored) {
-    try {
-      const data = JSON.parse(stored) as DevSessionData;
-      
-      // Verify the session still exists
-      const response = await fetch(`http://localhost:3000/api/dev/thread/${data.sessionId}/stats`);
-      if (response.ok) {
-        return data;
-      }
-    } catch (error) {
-      console.warn('Stored dev session is invalid, creating new one');
-    }
-  }
-
+  // For now, always create a new session to avoid stale session issues
+  // TODO: Add proper session validation and reuse
+  console.log('Creating new development session...');
+  
   // Create a new session
   const newSession = await createDevSession();
   

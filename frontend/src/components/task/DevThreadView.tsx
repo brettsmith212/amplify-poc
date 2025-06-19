@@ -141,8 +141,7 @@ const DevThreadInterface: React.FC<{ sessionId: string }> = ({ sessionId }) => {
 
   const handleSendMessage = async (content: string): Promise<void> => {
     try {
-      // For development, just add the message locally
-      // In a real implementation, this would send to the backend
+      // Add user message immediately
       const userMessage = {
         id: `user-${Date.now()}`,
         role: 'user' as const,
@@ -153,20 +152,55 @@ const DevThreadInterface: React.FC<{ sessionId: string }> = ({ sessionId }) => {
       
       addMessage(userMessage);
       
-      // Simulate an amp response after a delay
-      setTimeout(() => {
+      // Send message to amp via the backend
+      const response = await fetch(`http://localhost:3000/api/dev/thread/${sessionId}/message`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ content }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to send message: ${response.status} ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      
+      if (data.success && data.response) {
+        // Add amp response message
         const ampMessage = {
           id: `amp-${Date.now()}`,
           role: 'amp' as const,
-          content: `Echo: ${content} (This is a development response)`,
+          content: data.response,
           ts: new Date().toISOString(),
           metadata: {}
         };
         addMessage(ampMessage);
-      }, 1000);
+      } else if (!data.success) {
+        // Add error message
+        const errorMessage = {
+          id: `error-${Date.now()}`,
+          role: 'system' as const,
+          content: `Error: ${data.message || 'Failed to get response from amp'}`,
+          ts: new Date().toISOString(),
+          metadata: {}
+        };
+        addMessage(errorMessage);
+      }
       
     } catch (error) {
       console.error('Error sending message:', error);
+      
+      // Add error message to chat
+      const errorMessage = {
+        id: `error-${Date.now()}`,
+        role: 'system' as const,
+        content: `Error: ${error instanceof Error ? error.message : 'Unknown error occurred'}`,
+        ts: new Date().toISOString(),
+        metadata: {}
+      };
+      addMessage(errorMessage);
     }
   };
 

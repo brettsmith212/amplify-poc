@@ -100,6 +100,94 @@ router.post('/create', async (req: Request, res: Response): Promise<void> => {
 });
 
 /**
+ * Development-only route to send a message to amp
+ * POST /api/dev/thread/:sessionId/message
+ */
+router.post('/:sessionId/message', async (req: Request, res: Response): Promise<void> => {
+  try {
+    if (process.env.NODE_ENV === 'production') {
+      res.status(403).json({ error: 'Development routes not available in production' });
+      return;
+    }
+
+    const { sessionId } = req.params;
+    const { content } = req.body;
+
+    if (!sessionId) {
+      res.status(400).json({ error: 'Session ID is required' });
+      return;
+    }
+
+    if (!content || typeof content !== 'string') {
+      res.status(400).json({ error: 'Message content is required' });
+      return;
+    }
+
+    // Get the session
+    const session = sessionStore.getSession(sessionId);
+    if (!session) {
+      res.status(404).json({ error: 'Session not found' });
+      return;
+    }
+
+    if (!session.threadId) {
+      res.status(400).json({ error: 'Session does not have a thread ID' });
+      return;
+    }
+
+    if (!session.ampLogPath) {
+      res.status(400).json({ error: 'Session does not have an amp log path' });
+      return;
+    }
+
+    devLogger.info('Sending message to amp thread', {
+      sessionId,
+      threadId: session.threadId,
+      messageLength: content.length
+    });
+
+    // Send message to amp using amp threads continue
+    const result = await ampService.continueThread(session.threadId, content, {
+      workingDirectory: `/tmp/amplify-data/${sessionId}`,
+      ampLogPath: session.ampLogPath
+    });
+
+    if (!result.success) {
+      devLogger.error('Failed to send message to amp', {
+        sessionId,
+        threadId: session.threadId,
+        error: result.error
+      });
+
+      res.status(500).json({
+        error: 'Failed to send message to amp',
+        message: result.error
+      });
+      return;
+    }
+
+    devLogger.info('Message sent to amp successfully', {
+      sessionId,
+      threadId: session.threadId,
+      responseLength: result.response?.length || 0
+    });
+
+    res.json({
+      success: true,
+      response: result.response,
+      threadId: session.threadId
+    });
+
+  } catch (error) {
+    devLogger.error('Error sending message to amp:', error);
+    res.status(500).json({
+      error: 'Internal server error',
+      message: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
+/**
  * Development-only route to get thread messages without authentication
  * GET /api/dev/thread/:sessionId/messages
  */
