@@ -46,7 +46,7 @@
   - **Step Dependencies**: Step 2
   - **User Instructions**: This creates the REST API. Test endpoints with curl or Postman to verify correct message retrieval and pagination.
 
-- [ ] Step 5: Implement WebSocket Thread Communication
+- [x] Step 5: Implement WebSocket Thread Communication
   - **Task**: Create WebSocket handlers for real-time thread message streaming and user input handling
   - **Description**: Establishes bidirectional communication for real-time chat. Handles inbound user messages (which trigger amp commands) and outbound parsed messages from logs.
   - **Files**:

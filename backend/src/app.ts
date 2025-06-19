@@ -16,6 +16,7 @@ import { CleanupService } from './services/cleanup';
 import { ContainerManager } from './docker/containerManager';
 import { DockerExecManager } from './docker/execManager';
 import { TerminalBridge } from './websocket/terminalBridge';
+import { threadWebSocketManager } from './websocket/threadWebSocket';
 import { logger } from './utils/logger';
 
 import {
@@ -157,6 +158,7 @@ export class WebApp {
     this.app.get('/api/status', (req, res) => {
       const sessionStats = sessionStore.getStats();
       const cleanupStats = this.cleanupService.getStats();
+      const threadWebSocketStats = threadWebSocketManager.getStats();
       
       res.json({
         status: 'running',
@@ -165,6 +167,7 @@ export class WebApp {
         version: process.env.npm_package_version || '0.1.0',
         sessions: sessionStats,
         cleanup: cleanupStats,
+        threadWebSockets: threadWebSocketStats,
         uptime: process.uptime()
       });
     });
@@ -211,7 +214,7 @@ export class WebApp {
   }
 
   /**
-   * Setup WebSocket server for terminal connections
+   * Setup WebSocket server for terminal and thread connections
    */
   private setupWebSocket(): void {
     if (!this.server || !this.options.enableWebSocket) {
@@ -241,26 +244,45 @@ export class WebApp {
           return;
         }
 
-        // Extract session ID from URL path: /ws/:sessionId
-        const sessionIdMatch = url.match(/^\/ws\/([^/?]+)/);
-        const sessionId = sessionIdMatch ? sessionIdMatch[1] : undefined;
-
         const clientInfo = {
           ...(request.socket.remoteAddress && { remoteAddress: request.socket.remoteAddress }),
           ...(request.headers['user-agent'] && { userAgent: request.headers['user-agent'] })
         };
 
-        const actualSessionId = await this.terminalBridge!.handleConnection(
-          ws, 
-          sessionId, 
-          clientInfo
-        );
-        
-        appLogger.info(`WebSocket terminal connection established: ${actualSessionId}`, {
-          requestedSessionId: sessionId,
-          clientIp: request.socket.remoteAddress,
-          userAgent: request.headers['user-agent']
-        });
+        // Route to appropriate handler based on URL path
+        if (url.startsWith('/ws/thread/')) {
+          // Thread WebSocket connection: /ws/thread/:sessionId
+          const sessionIdMatch = url.match(/^\/ws\/thread\/([^/?]+)/);
+          const sessionId = sessionIdMatch ? sessionIdMatch[1] : undefined;
+
+          const wsSessionId = await threadWebSocketManager.handleConnection(
+            ws, 
+            sessionId, 
+            clientInfo
+          );
+          
+          appLogger.info(`WebSocket thread connection established: ${wsSessionId}`, {
+            sessionId,
+            clientIp: request.socket.remoteAddress,
+            userAgent: request.headers['user-agent']
+          });
+        } else {
+          // Terminal WebSocket connection: /ws/:sessionId
+          const sessionIdMatch = url.match(/^\/ws\/([^/?]+)/);
+          const sessionId = sessionIdMatch ? sessionIdMatch[1] : undefined;
+
+          const actualSessionId = await this.terminalBridge!.handleConnection(
+            ws, 
+            sessionId, 
+            clientInfo
+          );
+          
+          appLogger.info(`WebSocket terminal connection established: ${actualSessionId}`, {
+            requestedSessionId: sessionId,
+            clientIp: request.socket.remoteAddress,
+            userAgent: request.headers['user-agent']
+          });
+        }
       } catch (error) {
         appLogger.error('Failed to handle WebSocket connection:', error);
         ws.close();
@@ -272,6 +294,7 @@ export class WebApp {
       if (this.terminalBridge) {
         this.terminalBridge.pingAllSessions();
       }
+      threadWebSocketManager.pingAllSessions();
     }, 30000); // Ping every 30 seconds
 
     this.wss.on('close', () => {
@@ -349,6 +372,9 @@ export class WebApp {
     if (this.wss) {
       this.wss.close();
     }
+
+    // Shutdown thread WebSocket manager
+    threadWebSocketManager.shutdown();
 
     // Close HTTP server
     if (this.server) {
