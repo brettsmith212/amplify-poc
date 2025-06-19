@@ -161,7 +161,7 @@
 
 ## Backend Integration & Session Updates
 
-- [ ] Step 15: Update Session Creation for Thread Bootstrap
+- [x] Step 15: Update Session Creation for Thread Bootstrap
 
   - **Task**: Modify session creation process to execute `amp threads new` command and store thread metadata
   - **Description**: This integrates thread creation into the existing session workflow. When a session is created, it now also bootstraps an amp thread and stores the relevant metadata.

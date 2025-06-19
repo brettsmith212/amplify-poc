@@ -18,7 +18,8 @@
     "noImplicitReturns": true,
     "noFallthroughCasesInSwitch": true,
     "noUncheckedIndexedAccess": true,
-    "exactOptionalPropertyTypes": true
+    "exactOptionalPropertyTypes": true,
+    "types": ["node", "jest"]
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist", "**/*.test.ts", "**/*.spec.ts"]
