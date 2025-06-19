@@ -84,6 +84,100 @@ async function addSessionMessage(sessionId: string, message: ParsedMessage): Pro
   }
 }
 
+/**
+ * Extract only the new assistant response from the full conversation output
+ */
+async function extractNewAssistantResponse(sessionId: string, fullResponse: string): Promise<string> {
+  try {
+    // Get existing messages to build the expected conversation so far
+    const existingMessages = await loadSessionMessages(sessionId);
+    
+    // Build the expected conversation content from existing assistant messages
+    const existingAssistantContent = existingMessages
+      .filter(msg => msg.type === 'assistant')
+      .map(msg => msg.content)
+      .join('\n\n');
+    
+    devLogger.info('Extracting new assistant response', { 
+      sessionId, 
+      fullResponseLength: fullResponse.length,
+      existingContentLength: existingAssistantContent.length,
+      existingAssistantMessages: existingMessages.filter(msg => msg.type === 'assistant').length
+    });
+    
+    // If this is the first assistant message, return the full response
+    if (!existingAssistantContent.trim()) {
+      devLogger.info('First assistant message, returning full response', { sessionId });
+      return fullResponse.trim();
+    }
+    
+    // Find where the existing content ends in the full response
+    const existingContentInResponse = fullResponse.indexOf(existingAssistantContent);
+    
+    if (existingContentInResponse !== -1) {
+      // Extract everything after the existing content
+      const startIndex = existingContentInResponse + existingAssistantContent.length;
+      const newContent = fullResponse.substring(startIndex).trim();
+      
+      devLogger.info('Extracted new content after existing', { 
+        sessionId, 
+        newContentLength: newContent.length,
+        newContentPreview: newContent.substring(0, 100)
+      });
+      
+      return newContent;
+    } else {
+      // Fallback: try to find common patterns and extract the new part
+      // This handles cases where the response format might be slightly different
+      
+      // Split the response into parts and try to find the new content
+      const responseLines = fullResponse.split('\n').filter(line => line.trim());
+      const existingLines = existingAssistantContent.split('\n').filter(line => line.trim());
+      
+      // Find the last common line and extract everything after it
+      let newLines: string[] = [];
+      let foundDivergence = false;
+      
+      for (let i = 0; i < responseLines.length; i++) {
+        const responseLine = responseLines[i];
+        const existingLine = existingLines[i];
+        
+        if (i < existingLines.length && responseLine && existingLine && responseLine.trim() === existingLine.trim()) {
+          // This line matches existing content, skip it
+          continue;
+        } else {
+          // Found new content, take everything from here
+          newLines = responseLines.slice(i);
+          foundDivergence = true;
+          break;
+        }
+      }
+      
+      if (foundDivergence && newLines.length > 0) {
+        const newContent = newLines.join('\n').trim();
+        devLogger.info('Extracted new content via line-by-line comparison', { 
+          sessionId, 
+          newContentLength: newContent.length 
+        });
+        return newContent;
+      }
+      
+      // Last resort: if we can't parse it properly, return the full response
+      // but log a warning
+      devLogger.warn('Could not extract incremental response, returning full response', { 
+        sessionId,
+        fullResponsePreview: fullResponse.substring(0, 200)
+      });
+      
+      return fullResponse.trim();
+    }
+  } catch (error) {
+    devLogger.error('Error extracting new assistant response', { sessionId, error });
+    // Fallback to full response if extraction fails
+    return fullResponse.trim();
+  }
+}
+
 // Disable rate limiting for development routes
 router.use((req, res, next) => {
   // Skip rate limiting in development
@@ -247,26 +341,32 @@ router.post('/:sessionId/message', async (req: Request, res: Response): Promise<
       return;
     }
 
-    // Store the assistant response
-    const assistantMessage: ParsedMessage = {
-      id: `assistant-${Date.now()}-${Math.random()}`,
-      type: 'assistant',
-      content: result.response || 'No response received',
-      timestamp: new Date().toISOString(),
-      metadata: { source: 'amp' }
-    };
+    // Extract only the new assistant response (not the full conversation)
+    const newAssistantContent = await extractNewAssistantResponse(sessionId, result.response || '');
     
-    await addSessionMessage(sessionId, assistantMessage);
+    if (newAssistantContent.trim()) {
+      const assistantMessage: ParsedMessage = {
+        id: `assistant-${Date.now()}-${Math.random()}`,
+        type: 'assistant',
+        content: newAssistantContent,
+        timestamp: new Date().toISOString(),
+        metadata: { source: 'amp' }
+      };
+      
+      await addSessionMessage(sessionId, assistantMessage);
+    }
 
     devLogger.info('Message sent to amp successfully', {
       sessionId,
       threadId: session.threadId,
-      responseLength: result.response?.length || 0
+      responseLength: result.response?.length || 0,
+      incrementalResponseLength: newAssistantContent.length
     });
 
     res.json({
       success: true,
-      response: result.response,
+      response: newAssistantContent, // Return only the incremental response, not the full conversation
+      fullResponse: result.response, // Include full response for debugging if needed
       threadId: session.threadId
     });
 
