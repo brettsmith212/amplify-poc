@@ -126,7 +126,7 @@
   - **Step Dependencies**: Step 5
   - **User Instructions**: This enables real-time communication. Test connection establishment, message sending/receiving, and reconnection behavior.
 
-- [ ] Step 12: Connect Thread Data Flow
+- [x] Step 12: Connect Thread Data Flow
   - **Task**: Integrate WebSocket client with ThreadView component to enable real-time message streaming and user input handling
   - **Description**: This completes the data flow loop, connecting the UI components with the WebSocket communication layer. Messages from the backend stream into the UI, and user input flows back to trigger amp commands.
   - **Files**:

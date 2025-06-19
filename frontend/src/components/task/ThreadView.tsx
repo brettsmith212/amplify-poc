@@ -3,6 +3,8 @@ import { ThreadMessage } from '../../types/threadMessage';
 import MessageBubble from './MessageBubble';
 import MessageInput from './MessageInput';
 import useAutoScroll from '../../hooks/useAutoScroll';
+import useThreadMessages from '../../hooks/useThreadMessages';
+import { ConnectionState } from '../../services/threadWebSocket';
 
 export interface ThreadViewProps {
   /**
@@ -11,34 +13,29 @@ export interface ThreadViewProps {
   sessionId: string;
   
   /**
-   * Array of messages to display
-   */
-  messages: ThreadMessage[];
-  
-  /**
-   * Whether the component is in a loading state
-   */
-  isLoading?: boolean;
-  
-  /**
-   * Whether the WebSocket connection is active
-   */
-  isConnected?: boolean;
-  
-  /**
-   * Callback when user sends a message
-   */
-  onSendMessage?: (message: string) => void;
-  
-  /**
-   * Whether the send functionality is currently processing
-   */
-  isSending?: boolean;
-  
-  /**
    * Custom className for the container
    */
   className?: string;
+  
+  /**
+   * Whether to automatically load message history
+   */
+  loadHistory?: boolean;
+  
+  /**
+   * API base URL for HTTP requests
+   */
+  apiBaseUrl?: string;
+  
+  /**
+   * Callback when connection state changes
+   */
+  onConnectionChange?: (state: ConnectionState) => void;
+  
+  /**
+   * Callback when an error occurs
+   */
+  onError?: (error: Error) => void;
 }
 
 // Loading spinner component
@@ -52,15 +49,70 @@ const LoadingSpinner: React.FC<{ className?: string }> = ({ className = '' }) =>
 );
 
 // Connection status component
-const ConnectionStatus: React.FC<{ isConnected: boolean }> = ({ isConnected }) => {
-  if (isConnected) return null;
+const ConnectionStatus: React.FC<{ 
+  connectionState: ConnectionState; 
+  onRetry?: () => void;
+}> = ({ connectionState, onRetry }) => {
+  if (connectionState === ConnectionState.CONNECTED) return null;
+
+  const getStatusConfig = () => {
+    switch (connectionState) {
+      case ConnectionState.CONNECTING:
+        return {
+          bgColor: 'bg-blue-50 dark:bg-blue-900/20',
+          borderColor: 'border-blue-200 dark:border-blue-800',
+          textColor: 'text-blue-600 dark:text-blue-400',
+          iconColor: 'bg-blue-500',
+          message: 'Connecting to session...',
+          showRetry: false
+        };
+      case ConnectionState.RECONNECTING:
+        return {
+          bgColor: 'bg-yellow-50 dark:bg-yellow-900/20',
+          borderColor: 'border-yellow-200 dark:border-yellow-800',
+          textColor: 'text-yellow-600 dark:text-yellow-400',
+          iconColor: 'bg-yellow-500',
+          message: 'Reconnecting...',
+          showRetry: false
+        };
+      case ConnectionState.ERROR:
+        return {
+          bgColor: 'bg-red-50 dark:bg-red-900/20',
+          borderColor: 'border-red-200 dark:border-red-800',
+          textColor: 'text-red-600 dark:text-red-400',
+          iconColor: 'bg-red-500',
+          message: 'Connection failed',
+          showRetry: true
+        };
+      case ConnectionState.DISCONNECTED:
+      default:
+        return {
+          bgColor: 'bg-gray-50 dark:bg-gray-900/20',
+          borderColor: 'border-gray-200 dark:border-gray-800',
+          textColor: 'text-gray-600 dark:text-gray-400',
+          iconColor: 'bg-gray-500',
+          message: 'Disconnected',
+          showRetry: true
+        };
+    }
+  };
+
+  const config = getStatusConfig();
 
   return (
-    <div className="flex items-center justify-center p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg mb-4">
-      <div className="flex items-center space-x-2 text-yellow-600 dark:text-yellow-400">
-        <div className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse"></div>
-        <span className="text-sm">Connecting to session...</span>
+    <div className={`flex items-center justify-between p-4 ${config.bgColor} border ${config.borderColor} rounded-lg mb-4`}>
+      <div className={`flex items-center space-x-2 ${config.textColor}`}>
+        <div className={`w-2 h-2 ${config.iconColor} rounded-full ${connectionState === ConnectionState.CONNECTING || connectionState === ConnectionState.RECONNECTING ? 'animate-pulse' : ''}`}></div>
+        <span className="text-sm">{config.message}</span>
       </div>
+      {config.showRetry && onRetry && (
+        <button
+          onClick={onRetry}
+          className={`px-3 py-1 text-xs rounded-md border ${config.textColor} hover:bg-white/50 dark:hover:bg-black/20 transition-colors`}
+        >
+          Retry
+        </button>
+      )}
     </div>
   );
 };
@@ -88,13 +140,29 @@ const EmptyState: React.FC = () => (
 
 // Main ThreadView component
 export const ThreadView: React.FC<ThreadViewProps> = ({
-  messages,
-  isLoading = false,
-  isConnected = true,
-  onSendMessage,
-  isSending = false,
-  className = ''
+  sessionId,
+  className = '',
+  loadHistory = true,
+  apiBaseUrl,
+  onConnectionChange,
+  onError
 }) => {
+  const {
+    messages,
+    isConnected,
+    connectionState,
+    isLoading,
+    isSending,
+    error,
+    sendMessage,
+    clearError,
+    reconnect
+  } = useThreadMessages({
+    sessionId,
+    loadHistory,
+    apiBaseUrl
+  });
+
   const { scrollRef } = useAutoScroll({
     dependencies: [messages.length],
     enabled: true,
@@ -104,11 +172,37 @@ export const ThreadView: React.FC<ThreadViewProps> = ({
 
   const hasMessages = messages.length > 0;
 
+  // Handle connection state changes
+  React.useEffect(() => {
+    if (onConnectionChange) {
+      onConnectionChange(connectionState);
+    }
+  }, [connectionState, onConnectionChange]);
+
+  // Handle errors
+  React.useEffect(() => {
+    if (error && onError) {
+      onError(error);
+    }
+  }, [error, onError]);
+
+  const handleSendMessage = async (content: string) => {
+    const success = await sendMessage(content);
+    if (!success && error) {
+      console.error('Failed to send message:', error);
+    }
+  };
+
+  const handleRetry = () => {
+    clearError();
+    reconnect();
+  };
+
   return (
     <div className={`flex flex-col h-full bg-gray-50 dark:bg-gray-900 ${className}`}>
       {/* Connection Status */}
       <div className="flex-shrink-0 p-4">
-        <ConnectionStatus isConnected={isConnected} />
+        <ConnectionStatus connectionState={connectionState} onRetry={handleRetry} />
       </div>
 
       {/* Messages Area */}
@@ -136,7 +230,7 @@ export const ThreadView: React.FC<ThreadViewProps> = ({
       {/* Message Input */}
       <div className="flex-shrink-0">
         <MessageInput
-          onSendMessage={onSendMessage}
+          onSendMessage={handleSendMessage}
           isSending={isSending}
           disabled={!isConnected || isLoading}
         />
