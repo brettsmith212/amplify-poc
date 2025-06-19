@@ -175,16 +175,18 @@ describe('MessageBubble', () => {
   });
 
   describe('Content Rendering', () => {
-    it('preserves whitespace in message content', () => {
+    it('renders message content with MarkdownRenderer', () => {
       const multilineMessage: ThreadMessage = {
         ...baseMessage,
-        content: 'Line 1\nLine 2\n  Indented line'
+        content: 'Line 1\n\nLine 2\n\n  Indented line'
       };
       
       const { container } = render(<MessageBubble message={multilineMessage} />);
       
-      const contentDiv = container.querySelector('.whitespace-pre-wrap');
-      expect(contentDiv?.textContent).toBe('Line 1\nLine 2\n  Indented line');
+      // Check that the content is rendered (MarkdownRenderer converts newlines to paragraphs)
+      expect(container.textContent).toContain('Line 1');
+      expect(container.textContent).toContain('Line 2');
+      expect(container.textContent).toContain('Indented line');
     });
 
     it('handles empty content', () => {

@@ -1,6 +1,7 @@
 import React from 'react';
 import { MessageBubbleProps, MessageRole, RoleConfig } from '../../types/threadMessage';
 import { formatTimestamp, getMetadataDisplay, formatFilesList } from '../../utils/messageFormatting';
+import MarkdownRenderer from '../ui/MarkdownRenderer';
 
 // Icon components for different roles
 const UserIcon: React.FC<{ className?: string }> = ({ className = '' }) => (
@@ -161,11 +162,10 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
           )}
           
           {/* Message Content */}
-          <div className="prose prose-sm dark:prose-invert max-w-none">
-            <div className="text-gray-900 dark:text-gray-100 whitespace-pre-wrap">
-              {content}
-            </div>
-          </div>
+          <MarkdownRenderer 
+            content={content}
+            className="text-gray-900 dark:text-gray-100"
+          />
           
           {/* Files List */}
           {files.length > 0 && (
