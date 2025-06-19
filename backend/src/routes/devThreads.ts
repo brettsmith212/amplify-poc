@@ -36,9 +36,13 @@ function getMessageStorePath(sessionId: string): string {
 async function loadSessionMessages(sessionId: string): Promise<ParsedMessage[]> {
   try {
     const messageStorePath = getMessageStorePath(sessionId);
+    devLogger.info('Loading session messages', { sessionId, messageStorePath });
     const content = await fs.readFile(messageStorePath, 'utf-8');
-    return JSON.parse(content);
+    const messages = JSON.parse(content);
+    devLogger.info('Session messages loaded successfully', { sessionId, messageCount: messages.length });
+    return messages;
   } catch (error) {
+    devLogger.info('No session messages file found, returning empty array', { sessionId, error: error instanceof Error ? error.message : 'Unknown error' });
     // If file doesn't exist or can't be read, return empty array
     return [];
   }
@@ -50,7 +54,14 @@ async function loadSessionMessages(sessionId: string): Promise<ParsedMessage[]> 
 async function saveSessionMessages(sessionId: string, messages: ParsedMessage[]): Promise<void> {
   try {
     const messageStorePath = getMessageStorePath(sessionId);
+    const dirPath = `/tmp/amplify-data/${sessionId}`;
+    
+    // Ensure directory exists
+    await fs.mkdir(dirPath, { recursive: true });
+    
+    devLogger.info('Saving session messages', { sessionId, messageStorePath, messageCount: messages.length });
     await fs.writeFile(messageStorePath, JSON.stringify(messages, null, 2));
+    devLogger.info('Session messages saved successfully', { sessionId, messageStorePath });
   } catch (error) {
     devLogger.error('Error saving session messages:', { sessionId, error });
     throw error;
@@ -61,9 +72,16 @@ async function saveSessionMessages(sessionId: string, messages: ParsedMessage[])
  * Add a message to the session message store
  */
 async function addSessionMessage(sessionId: string, message: ParsedMessage): Promise<void> {
-  const messages = await loadSessionMessages(sessionId);
-  messages.push(message);
-  await saveSessionMessages(sessionId, messages);
+  try {
+    devLogger.info('Adding session message', { sessionId, messageType: message.type, messageLength: message.content.length });
+    const messages = await loadSessionMessages(sessionId);
+    messages.push(message);
+    await saveSessionMessages(sessionId, messages);
+    devLogger.info('Session message saved successfully', { sessionId, totalMessages: messages.length });
+  } catch (error) {
+    devLogger.error('Error adding session message', { sessionId, error });
+    throw error;
+  }
 }
 
 // Disable rate limiting for development routes
@@ -285,7 +303,9 @@ router.get('/:sessionId/messages', async (req: Request, res: Response): Promise<
     }
 
     // Load messages from structured message store
+    devLogger.info('About to load session messages for route', { sessionId });
     const messages = await loadSessionMessages(sessionId);
+    devLogger.info('Messages loaded in route', { sessionId, messageCount: messages.length });
     
     res.json({
       messages,
@@ -344,17 +364,15 @@ router.get('/:sessionId/stats', async (req: Request, res: Response): Promise<voi
     let messageCount = 0;
     let lastMessageTime: string | undefined;
     
-    if (session.ampLogPath) {
-      try {
-        const messages = await parseAmpLogMessages(session.ampLogPath);
-        messageCount = messages.length;
-        if (messages.length > 0) {
-          lastMessageTime = messages[messages.length - 1]?.timestamp;
-        }
-      } catch (error) {
-        // Log error but continue with default values
-        devLogger.warn('Failed to parse messages for stats:', { sessionId, error });
+    try {
+      const messages = await loadSessionMessages(sessionId);
+      messageCount = messages.length;
+      if (messages.length > 0) {
+        lastMessageTime = messages[messages.length - 1]?.timestamp;
       }
+    } catch (error) {
+      // Log error but continue with default values
+      devLogger.warn('Failed to load messages for stats:', { sessionId, error });
     }
 
     res.json({
@@ -385,16 +403,31 @@ router.get('/sessions', async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    const sessions = sessionStore.getUserSessions('dev-user')
-      .filter((s: any) => s.id.startsWith('dev-session-'))
-      .map((s: any) => ({
-        id: s.id,
-        threadId: sessionStore.getSession(s.id)?.threadId,
-        status: s.status,
-        createdAt: s.createdAt,
-        repositoryUrl: s.repositoryName,
-        branch: s.branch
-      }));
+    const sessions = await Promise.all(
+      sessionStore.getUserSessions('dev-user')
+        .filter((s: any) => s.id.startsWith('dev-session-'))
+        .map(async (s: any) => {
+          const session = sessionStore.getSession(s.id);
+          const messages = await loadSessionMessages(s.id);
+          const lastMessage = messages.length > 0 ? messages[messages.length - 1] : null;
+          
+          return {
+            sessionId: s.id,
+            threadId: session?.threadId,
+            status: s.status,
+            createdAt: s.createdAt,
+            lastAccessedAt: s.lastAccessedAt,
+            messageCount: messages.length,
+            lastMessage: lastMessage ? {
+              content: lastMessage.content.substring(0, 100) + (lastMessage.content.length > 100 ? '...' : ''),
+              timestamp: lastMessage.timestamp,
+              type: lastMessage.type
+            } : null,
+            repositoryUrl: s.repositoryName,
+            branch: s.branch
+          };
+        })
+    );
 
     res.json({ sessions });
 

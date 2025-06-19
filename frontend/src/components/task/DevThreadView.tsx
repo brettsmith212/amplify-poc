@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { getOrCreateDevSession, DevSessionData, isDevModeAvailable, clearDevSession, createDevSession } from '../../services/devSession';
+import { getOrCreateDevSession, DevSessionData, isDevModeAvailable, clearDevSession, createDevSession, switchToThread } from '../../services/devSession';
 import DevThreadInterface from './DevThreadInterface';
 
 interface DevThreadViewProps {
@@ -65,6 +65,26 @@ export const DevThreadView: React.FC<DevThreadViewProps> = ({ onError }) => {
       
       // Create a new session
       const newSession = await createDevSession();
+      
+      // Store it and add to history
+      localStorage.setItem('dev-session', JSON.stringify(newSession));
+      
+      // Add to thread history manually since createDevSession doesn't do this
+      const history = JSON.parse(localStorage.getItem('dev-thread-history') || '[]');
+      const newHistoryEntry = { ...newSession, lastAccessed: new Date().toISOString() };
+      const existingIndex = history.findIndex((t: any) => t.sessionId === newSession.sessionId);
+      
+      if (existingIndex >= 0) {
+        history[existingIndex] = newHistoryEntry;
+      } else {
+        history.push(newHistoryEntry);
+      }
+      
+      // Keep only last 10 threads
+      const sortedHistory = history.sort((a: any, b: any) => new Date(b.lastAccessed).getTime() - new Date(a.lastAccessed).getTime());
+      const trimmedHistory = sortedHistory.slice(0, 10);
+      localStorage.setItem('dev-thread-history', JSON.stringify(trimmedHistory));
+      
       setDevSession(newSession);
       
       console.log('New development session created:', newSession);
@@ -73,6 +93,25 @@ export const DevThreadView: React.FC<DevThreadViewProps> = ({ onError }) => {
       setError(error);
       onError?.(error);
       console.error('Failed to create new thread:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSelectThread = async (sessionData: DevSessionData) => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      
+      const switchedSession = await switchToThread(sessionData);
+      setDevSession(switchedSession);
+      
+      console.log('Switched to thread:', switchedSession.sessionId);
+    } catch (err) {
+      const error = err instanceof Error ? err : new Error('Failed to switch to thread');
+      setError(error);
+      onError?.(error);
+      console.error('Failed to switch to thread:', error);
     } finally {
       setIsLoading(false);
     }
@@ -134,10 +173,12 @@ export const DevThreadView: React.FC<DevThreadViewProps> = ({ onError }) => {
   }
 
   // Render the custom development thread interface
+  console.log('DevThreadView: Rendering sessionId =', devSession.sessionId);
   return (
     <DevThreadInterface 
       sessionId={devSession.sessionId}
       onNewThread={handleNewThread}
+      onSelectThread={handleSelectThread}
     />
   );
 };

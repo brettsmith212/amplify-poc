@@ -49,6 +49,40 @@ async function validateSession(sessionData: DevSessionData): Promise<boolean> {
 }
 
 /**
+ * Store thread in history
+ */
+function addToThreadHistory(sessionData: DevSessionData): void {
+  const history = getThreadHistory();
+  const existingIndex = history.findIndex(t => t.sessionId === sessionData.sessionId);
+  
+  if (existingIndex >= 0) {
+    // Update existing entry
+    history[existingIndex] = { ...sessionData, lastAccessed: new Date().toISOString() };
+  } else {
+    // Add new entry
+    history.push({ ...sessionData, lastAccessed: new Date().toISOString() });
+  }
+  
+  // Keep only last 10 threads
+  const sortedHistory = history.sort((a, b) => new Date(b.lastAccessed).getTime() - new Date(a.lastAccessed).getTime());
+  const trimmedHistory = sortedHistory.slice(0, 10);
+  
+  localStorage.setItem('dev-thread-history', JSON.stringify(trimmedHistory));
+}
+
+/**
+ * Get thread history
+ */
+export function getThreadHistory(): Array<DevSessionData & { lastAccessed: string }> {
+  try {
+    const stored = localStorage.getItem('dev-thread-history');
+    return stored ? JSON.parse(stored) : [];
+  } catch {
+    return [];
+  }
+}
+
+/**
  * Get or create a development session
  * Stores the session info in localStorage for reuse
  */
@@ -60,6 +94,7 @@ export async function getOrCreateDevSession(): Promise<DevSessionData> {
       const sessionData = JSON.parse(stored) as DevSessionData;
       if (await validateSession(sessionData)) {
         console.log('Reusing existing development session:', sessionData.sessionId);
+        addToThreadHistory(sessionData);
         return sessionData;
       } else {
         console.log('Existing session is invalid, creating new one...');
@@ -76,10 +111,25 @@ export async function getOrCreateDevSession(): Promise<DevSessionData> {
   // Create a new session
   const newSession = await createDevSession();
   
-  // Store it for reuse
+  // Store it for reuse and add to history
   localStorage.setItem('dev-session', JSON.stringify(newSession));
+  addToThreadHistory(newSession);
   
   return newSession;
+}
+
+/**
+ * Switch to an existing thread
+ */
+export async function switchToThread(sessionData: DevSessionData): Promise<DevSessionData> {
+  // Validate the session is still active
+  if (await validateSession(sessionData)) {
+    localStorage.setItem('dev-session', JSON.stringify(sessionData));
+    addToThreadHistory(sessionData);
+    return sessionData;
+  } else {
+    throw new Error('Thread is no longer active');
+  }
 }
 
 /**

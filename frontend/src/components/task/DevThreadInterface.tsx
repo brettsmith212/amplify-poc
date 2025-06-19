@@ -7,16 +7,20 @@ import { ThreadMessage } from '../../types/threadMessage';
 interface DevThreadInterfaceProps {
   sessionId: string;
   onNewThread?: () => void;
+  onSelectThread?: (sessionData: any) => void;
 }
 
 /**
  * Standalone thread interface for development - no complex hooks
  */
-const DevThreadInterface: React.FC<DevThreadInterfaceProps> = ({ sessionId, onNewThread }) => {
+const DevThreadInterface: React.FC<DevThreadInterfaceProps> = ({ sessionId, onNewThread, onSelectThread }) => {
   const [messages, setMessages] = useState<ThreadMessage[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isInitialized, setIsInitialized] = useState(false);
+  const [showThreadList, setShowThreadList] = useState(false);
+  const [availableThreads, setAvailableThreads] = useState<any[]>([]);
+  const [threadsLoading, setThreadsLoading] = useState(false);
   const mountedRef = useRef(true);
 
   const {
@@ -164,6 +168,72 @@ const DevThreadInterface: React.FC<DevThreadInterfaceProps> = ({ sessionId, onNe
     }
   };
 
+  const loadAvailableThreads = async () => {
+    try {
+      setThreadsLoading(true);
+      
+      // Get threads from localStorage
+      const localThreads = JSON.parse(localStorage.getItem('dev-thread-history') || '[]');
+      
+      // Get threads from backend with message info
+      const response = await fetch('http://localhost:3000/api/dev/thread/sessions');
+      if (response.ok) {
+        const data = await response.json();
+        const backendThreads = data.sessions || [];
+        
+        // Merge local and backend thread data
+        const mergedThreads = localThreads.map((localThread: any) => {
+          const backendThread = backendThreads.find((bt: any) => bt.sessionId === localThread.sessionId);
+          return {
+            ...localThread,
+            messageCount: backendThread?.messageCount || 0,
+            lastMessage: backendThread?.lastMessage,
+            status: backendThread?.status || 'unknown'
+          };
+        }).filter((thread: any) => thread.sessionId !== sessionId); // Exclude current thread
+        
+        setAvailableThreads(mergedThreads);
+      } else {
+        // Fallback to just local threads
+        setAvailableThreads(localThreads.filter((thread: any) => thread.sessionId !== sessionId));
+      }
+    } catch (error) {
+      console.error('Failed to load available threads:', error);
+      // Fallback to localStorage only
+      const localThreads = JSON.parse(localStorage.getItem('dev-thread-history') || '[]');
+      setAvailableThreads(localThreads.filter((thread: any) => thread.sessionId !== sessionId));
+    } finally {
+      setThreadsLoading(false);
+    }
+  };
+
+  const handleShowThreadList = () => {
+    setShowThreadList(true);
+    loadAvailableThreads();
+  };
+
+  const handleSelectThreadFromList = (thread: any) => {
+    setShowThreadList(false);
+    if (onSelectThread) {
+      onSelectThread(thread);
+    }
+  };
+
+  const formatTimestamp = (timestamp: string) => {
+    const date = new Date(timestamp);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / (1000 * 60));
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffDays < 7) return `${diffDays}d ago`;
+    return date.toLocaleDateString();
+  };
+
   if (error) {
     return (
       <div className="flex-1 flex items-center justify-center p-4">
@@ -186,51 +256,125 @@ const DevThreadInterface: React.FC<DevThreadInterfaceProps> = ({ sessionId, onNe
 
   return (
     <div className="flex-1 flex flex-col h-full bg-gray-900 text-white">
-      {/* Header with New Thread Button */}
-      {onNewThread && (
-        <div className="border-b border-gray-700 p-4 flex justify-between items-center">
-          <div className="text-sm text-gray-400">Session: {sessionId}</div>
-          <button
-            onClick={onNewThread}
-            className="px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 transition-colors"
-          >
-            New Thread
-          </button>
+      {/* Header with Thread Controls */}
+      <div className="border-b border-gray-700 p-4 flex justify-between items-center">
+        <div className="text-sm text-gray-400">Session: {sessionId}</div>
+        <div className="flex gap-2">
+          {onSelectThread && (
+            <button
+              onClick={handleShowThreadList}
+              className="px-3 py-1 bg-green-600 text-white text-sm rounded hover:bg-green-700 transition-colors"
+            >
+              Existing Threads
+            </button>
+          )}
+          {onNewThread && (
+            <button
+              onClick={onNewThread}
+              className="px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 transition-colors"
+            >
+              New Thread
+            </button>
+          )}
         </div>
-      )}
+      </div>
       
-      {/* Messages Area */}
+      {/* Messages Area or Thread List */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4 min-h-0">
-        {isLoading && messages.length === 0 ? (
-          <div className="flex items-center justify-center h-full">
-            <div className="text-center">
-              <div className="mb-4">
-                <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-              </div>
-              <p className="text-gray-400">Loading messages...</p>
+        {showThreadList ? (
+          // Thread List View
+          <div className="space-y-4">
+            <div className="flex justify-between items-center">
+              <h2 className="text-xl font-semibold text-white">Existing Threads</h2>
+              <button
+                onClick={() => setShowThreadList(false)}
+                className="px-3 py-1 bg-gray-600 text-white text-sm rounded hover:bg-gray-700 transition-colors"
+              >
+                Back to Chat
+              </button>
             </div>
-          </div>
-        ) : (
-          <>
-            {messages.length === 0 ? (
-              <div className="flex items-center justify-center h-full">
+            
+            {threadsLoading ? (
+              <div className="flex items-center justify-center py-8">
                 <div className="text-center">
-                  <div className="text-gray-400 mb-2">💬 Development Thread</div>
-                  <div className="text-sm text-gray-500">Start a conversation with amp</div>
-                  <div className="text-xs text-gray-600 mt-2">Session: {sessionId}</div>
+                  <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-green-600 mb-4"></div>
+                  <p className="text-gray-400">Loading threads...</p>
                 </div>
               </div>
+            ) : availableThreads.length === 0 ? (
+              <div className="text-center py-8">
+                <div className="text-gray-400 mb-2">No other threads found</div>
+                <div className="text-sm text-gray-500">Create a new thread to start another conversation</div>
+              </div>
             ) : (
-              <div className="space-y-4">
-                {messages.map((message) => (
-                  <MessageBubble
-                    key={message.id}
-                    message={message}
-                  />
+              <div className="space-y-3">
+                {availableThreads.map((thread) => (
+                  <button
+                    key={thread.sessionId}
+                    onClick={() => handleSelectThreadFromList(thread)}
+                    className="w-full p-4 bg-gray-800 rounded-lg hover:bg-gray-700 transition-colors text-left border border-gray-700"
+                  >
+                    <div className="flex justify-between items-start mb-2">
+                      <div className="text-sm font-medium text-gray-300">
+                        Thread {thread.sessionId.split('-').pop()?.substring(0, 6)}
+                      </div>
+                      <div className="text-xs text-gray-500">
+                        {formatTimestamp(thread.lastAccessed)}
+                      </div>
+                    </div>
+                    
+                    {thread.lastMessage && (
+                      <div className="text-sm text-gray-400 mb-2">
+                        <span className={`inline-block w-2 h-2 rounded-full mr-2 ${
+                          thread.lastMessage.type === 'user' ? 'bg-green-500' : 'bg-blue-500'
+                        }`}></span>
+                        {thread.lastMessage.content}
+                      </div>
+                    )}
+                    
+                    <div className="text-xs text-gray-500">
+                      {thread.messageCount} messages • Thread ID: {thread.threadId?.substring(0, 12)}...
+                    </div>
+                  </button>
                 ))}
               </div>
             )}
-            <div ref={messagesEndRef} />
+          </div>
+        ) : (
+          // Chat View
+          <>
+            {isLoading && messages.length === 0 ? (
+              <div className="flex items-center justify-center h-full">
+                <div className="text-center">
+                  <div className="mb-4">
+                    <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                  </div>
+                  <p className="text-gray-400">Loading messages...</p>
+                </div>
+              </div>
+            ) : (
+              <>
+                {messages.length === 0 ? (
+                  <div className="flex items-center justify-center h-full">
+                    <div className="text-center">
+                      <div className="text-gray-400 mb-2">💬 Development Thread</div>
+                      <div className="text-sm text-gray-500">Start a conversation with amp</div>
+                      <div className="text-xs text-gray-600 mt-2">Session: {sessionId}</div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {messages.map((message) => (
+                      <MessageBubble
+                        key={message.id}
+                        message={message}
+                      />
+                    ))}
+                  </div>
+                )}
+                <div ref={messagesEndRef} />
+              </>
+            )}
           </>
         )}
       </div>
