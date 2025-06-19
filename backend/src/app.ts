@@ -37,6 +37,7 @@ import sessionRoutes from './routes/sessions';
 import gitRoutes from './routes/git';
 import diffRoutes from './routes/diff';
 import threadRoutes from './routes/threads';
+import devThreadRoutes from './routes/devThreads';
 
 const appLogger = logger.child('WebApp');
 
@@ -209,6 +210,11 @@ export class WebApp {
     
     // Thread message routes
     this.app.use('/api', threadRoutes);
+    
+    // Development thread routes (no authentication required)
+    if (webConfig.development.isDevelopment) {
+      this.app.use('/api/dev/thread', devThreadRoutes);
+    }
 
     appLogger.info('Routes configured');
   }

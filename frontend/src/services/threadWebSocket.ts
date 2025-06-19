@@ -114,7 +114,7 @@ export class ThreadWebSocketClient {
   ) {
     this.sessionId = sessionId;
     this.config = {
-      baseUrl: config.baseUrl || 'ws://localhost:3001',
+      baseUrl: config.baseUrl || 'ws://localhost:3000',
       maxReconnectAttempts: config.maxReconnectAttempts || 5,
       reconnectDelay: config.reconnectDelay || 1000,
       maxReconnectDelay: config.maxReconnectDelay || 30000,

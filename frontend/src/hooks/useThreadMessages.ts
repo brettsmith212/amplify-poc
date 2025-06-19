@@ -96,7 +96,7 @@ export const useThreadMessages = (options: UseThreadMessagesOptions): UseThreadM
     autoConnect = true,
     loadHistory: shouldLoadHistory = true,
     maxMessages = 1000,
-    apiBaseUrl = 'http://localhost:3001'
+    apiBaseUrl = 'http://localhost:3000'
   } = options;
 
   // State for additional functionality

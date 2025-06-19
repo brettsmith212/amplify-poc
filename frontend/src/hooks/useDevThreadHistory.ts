@@ -1,7 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { ThreadMessage } from '../types/threadMessage';
 
-export interface UseThreadHistoryOptions {
+export interface UseDevThreadHistoryOptions {
   /**
    * Session ID for the thread
    */
@@ -23,7 +23,7 @@ export interface UseThreadHistoryOptions {
   apiBaseUrl?: string;
 }
 
-export interface ThreadHistoryResponse {
+export interface DevThreadHistoryResponse {
   messages: ThreadMessage[];
   hasMore: boolean;
   total: number;
@@ -31,7 +31,7 @@ export interface ThreadHistoryResponse {
   prevCursor?: string;
 }
 
-export interface UseThreadHistoryReturn {
+export interface UseDevThreadHistoryReturn {
   /**
    * All loaded messages
    */
@@ -89,13 +89,9 @@ export interface UseThreadHistoryReturn {
 }
 
 /**
- * Custom hook for managing thread message history
- * 
- * This hook handles loading and managing historical thread messages
- * separate from real-time WebSocket updates. It provides pagination
- * support and integrates with the existing message system.
+ * Custom hook for managing thread message history using development endpoints
  */
-export const useThreadHistory = (options: UseThreadHistoryOptions): UseThreadHistoryReturn => {
+export const useDevThreadHistory = (options: UseDevThreadHistoryOptions): UseDevThreadHistoryReturn => {
   const {
     sessionId,
     autoLoad = false,
@@ -114,7 +110,15 @@ export const useThreadHistory = (options: UseThreadHistoryOptions): UseThreadHis
   
   // Refs
   const loadingRef = useRef(false);
+  const mountedRef = useRef(true);
   
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
   /**
    * Convert API response to ThreadMessage format
    */
@@ -128,14 +132,14 @@ export const useThreadHistory = (options: UseThreadHistoryOptions): UseThreadHis
       metadata: apiMessage.metadata || {}
     };
   }, []);
-  
+
   /**
-   * Load messages from the API
+   * Load messages from the development API
    */
   const loadMessages = useCallback(async (
     cursor?: string,
     _isRefresh = false
-  ): Promise<ThreadHistoryResponse> => {
+  ): Promise<DevThreadHistoryResponse> => {
     if (loadingRef.current) {
       throw new Error('Already loading');
     }
@@ -151,7 +155,7 @@ export const useThreadHistory = (options: UseThreadHistoryOptions): UseThreadHis
         params.append('after', cursor);
       }
       
-      const url = `${apiBaseUrl}/api/sessions/${sessionId}/thread?${params.toString()}`;
+      const url = `${apiBaseUrl}/api/dev/thread/${sessionId}/messages?${params.toString()}`;
       const response = await fetch(url);
       
       if (!response.ok) {
@@ -161,12 +165,12 @@ export const useThreadHistory = (options: UseThreadHistoryOptions): UseThreadHis
       const data = await response.json();
       
       // Convert API messages to ThreadMessage format
-      const convertedMessages = data.messages.map(convertApiMessage);
+      const convertedMessages = (data.messages || []).map(convertApiMessage);
       
       return {
         messages: convertedMessages,
-        hasMore: data.hasMore,
-        total: data.total,
+        hasMore: data.hasMore || false,
+        total: data.total || 0,
         nextCursor: data.nextCursor,
         prevCursor: data.prevCursor
       };
@@ -179,24 +183,30 @@ export const useThreadHistory = (options: UseThreadHistoryOptions): UseThreadHis
    * Load the initial set of messages
    */
   const loadHistory = useCallback(async (): Promise<void> => {
-    if (isLoading || !sessionId) return;
+    if (isLoading || !sessionId || !mountedRef.current) return;
     
     setIsLoading(true);
     
     try {
       const result = await loadMessages();
       
-      setMessages(result.messages);
-      setHasMore(result.hasMore);
-      setTotalCount(result.total);
-      setNextCursor(result.nextCursor);
-      setIsInitialLoad(false);
+      if (mountedRef.current) {
+        setMessages(result.messages);
+        setHasMore(result.hasMore);
+        setTotalCount(result.total);
+        setNextCursor(result.nextCursor);
+        setIsInitialLoad(false);
+      }
     } catch (err) {
-      const errorObj = err instanceof Error ? err : new Error('Failed to load thread history');
-      setError(errorObj);
-      console.error('Error loading thread history:', errorObj);
+      if (mountedRef.current) {
+        const errorObj = err instanceof Error ? err : new Error('Failed to load thread history');
+        setError(errorObj);
+        console.error('Error loading thread history:', errorObj);
+      }
     } finally {
-      setIsLoading(false);
+      if (mountedRef.current) {
+        setIsLoading(false);
+      }
     }
   }, [isLoading, sessionId, loadMessages]);
   
@@ -204,23 +214,29 @@ export const useThreadHistory = (options: UseThreadHistoryOptions): UseThreadHis
    * Load more messages (pagination)
    */
   const loadMoreMessages = useCallback(async (): Promise<void> => {
-    if (isLoading || !hasMore || !nextCursor || !sessionId) return;
+    if (isLoading || !hasMore || !nextCursor || !sessionId || !mountedRef.current) return;
     
     setIsLoading(true);
     
     try {
       const result = await loadMessages(nextCursor);
       
-      setMessages(prev => [...prev, ...result.messages]);
-      setHasMore(result.hasMore);
-      setTotalCount(result.total);
-      setNextCursor(result.nextCursor);
+      if (mountedRef.current) {
+        setMessages(prev => [...prev, ...result.messages]);
+        setHasMore(result.hasMore);
+        setTotalCount(result.total);
+        setNextCursor(result.nextCursor);
+      }
     } catch (err) {
-      const errorObj = err instanceof Error ? err : new Error('Failed to load more messages');
-      setError(errorObj);
-      console.error('Error loading more messages:', errorObj);
+      if (mountedRef.current) {
+        const errorObj = err instanceof Error ? err : new Error('Failed to load more messages');
+        setError(errorObj);
+        console.error('Error loading more messages:', errorObj);
+      }
     } finally {
-      setIsLoading(false);
+      if (mountedRef.current) {
+        setIsLoading(false);
+      }
     }
   }, [isLoading, hasMore, nextCursor, sessionId, loadMessages]);
   
@@ -228,23 +244,29 @@ export const useThreadHistory = (options: UseThreadHistoryOptions): UseThreadHis
    * Refresh the current page of messages
    */
   const refreshHistory = useCallback(async (): Promise<void> => {
-    if (isLoading || !sessionId) return;
+    if (isLoading || !sessionId || !mountedRef.current) return;
     
     setIsLoading(true);
     
     try {
       const result = await loadMessages(undefined, true);
       
-      setMessages(result.messages);
-      setHasMore(result.hasMore);
-      setTotalCount(result.total);
-      setNextCursor(result.nextCursor);
+      if (mountedRef.current) {
+        setMessages(result.messages);
+        setHasMore(result.hasMore);
+        setTotalCount(result.total);
+        setNextCursor(result.nextCursor);
+      }
     } catch (err) {
-      const errorObj = err instanceof Error ? err : new Error('Failed to refresh thread history');
-      setError(errorObj);
-      console.error('Error refreshing thread history:', errorObj);
+      if (mountedRef.current) {
+        const errorObj = err instanceof Error ? err : new Error('Failed to refresh thread history');
+        setError(errorObj);
+        console.error('Error refreshing thread history:', errorObj);
+      }
     } finally {
-      setIsLoading(false);
+      if (mountedRef.current) {
+        setIsLoading(false);
+      }
     }
   }, [isLoading, sessionId, loadMessages]);
   
@@ -252,19 +274,21 @@ export const useThreadHistory = (options: UseThreadHistoryOptions): UseThreadHis
    * Clear all loaded messages and reset state
    */
   const clearHistory = useCallback(() => {
-    setMessages([]);
-    setHasMore(true);
-    setTotalCount(0);
-    setNextCursor(undefined);
-    setError(null);
-    setIsInitialLoad(true);
+    if (mountedRef.current) {
+      setMessages([]);
+      setHasMore(true);
+      setTotalCount(0);
+      setNextCursor(undefined);
+      setError(null);
+      setIsInitialLoad(true);
+    }
   }, []);
   
   /**
    * Add new messages to the history (e.g., from real-time updates)
    */
   const addMessages = useCallback((newMessages: ThreadMessage[]) => {
-    if (newMessages.length === 0) return;
+    if (newMessages.length === 0 || !mountedRef.current) return;
     
     setMessages(prev => {
       // Filter out any duplicates by ID
@@ -291,7 +315,7 @@ export const useThreadHistory = (options: UseThreadHistoryOptions): UseThreadHis
   
   // Auto-load history on mount if enabled
   useEffect(() => {
-    if (autoLoad && sessionId && isInitialLoad && !isLoading && !loadingRef.current) {
+    if (autoLoad && sessionId && isInitialLoad && !isLoading && !loadingRef.current && mountedRef.current) {
       loadHistory();
     }
   }, [autoLoad, sessionId, isInitialLoad, isLoading, loadHistory]);
@@ -311,4 +335,4 @@ export const useThreadHistory = (options: UseThreadHistoryOptions): UseThreadHis
   };
 };
 
-export default useThreadHistory;
+export default useDevThreadHistory;

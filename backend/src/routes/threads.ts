@@ -5,8 +5,12 @@ import {
   getThreadStats,
   clearThreadMessages
 } from '../controllers/threadController';
+import { authenticateUser } from '../middleware/auth';
 
 const router = Router();
+
+// Apply authentication middleware but don't require it for thread routes
+router.use(authenticateUser);
 
 /**
  * GET /api/sessions/:sessionId/thread

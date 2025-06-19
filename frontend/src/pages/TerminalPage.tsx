@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import Terminal from '../components/Terminal';
-import ThreadView from '../components/task/ThreadView';
+import DevThreadView from '../components/task/DevThreadView';
 import GitDiff from '../components/task/GitDiff';
 import TaskTabs from '../components/task/TaskTabs';
 import { TabType } from '../types/tabs';
@@ -49,9 +49,10 @@ const TerminalPage = () => {
     switch (activeTab) {
       case 'thread':
         return (
-          <ThreadView 
-            sessionId={sessionId}
-            className="h-full"
+          <DevThreadView 
+            onError={(error) => {
+              console.error('Thread error:', error);
+            }}
           />
         );
       case 'terminal':
