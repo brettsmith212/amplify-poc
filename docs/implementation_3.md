@@ -35,7 +35,7 @@
 
 ## API Layer Development
 
-- [ ] Step 4: Create Thread Message API Endpoints
+- [x] Step 4: Create Thread Message API Endpoints
 
   - **Task**: Implement REST API endpoints for thread message retrieval with pagination support
   - **Description**: These endpoints provide the HTTP interface for the frontend to fetch thread history. Includes GET /sessions/{id}/thread for paginated message retrieval.

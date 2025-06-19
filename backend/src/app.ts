@@ -35,6 +35,7 @@ import githubRoutes from './routes/github';
 import sessionRoutes from './routes/sessions';
 import gitRoutes from './routes/git';
 import diffRoutes from './routes/diff';
+import threadRoutes from './routes/threads';
 
 const appLogger = logger.child('WebApp');
 
@@ -202,6 +203,9 @@ export class WebApp {
     
     // Diff routes for Monaco editor
     this.app.use('/api/sessions', diffRoutes);
+    
+    // Thread message routes
+    this.app.use('/api', threadRoutes);
 
     appLogger.info('Routes configured');
   }
