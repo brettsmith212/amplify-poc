@@ -3,6 +3,7 @@ import MessageBubble from './MessageBubble';
 import MessageInput from './MessageInput';
 import useAutoScroll from '../../hooks/useAutoScroll';
 import useThreadMessages from '../../hooks/useThreadMessages';
+import useThreadHistory from '../../hooks/useThreadHistory';
 import { ConnectionState } from '../../services/threadWebSocket';
 
 export interface ThreadViewProps {
@@ -146,30 +147,64 @@ export const ThreadView: React.FC<ThreadViewProps> = ({
   onConnectionChange,
   onError
 }) => {
+  // Get WebSocket connection and real-time messages
   const {
-    messages,
+    messages: wsMessages,
     isConnected,
     connectionState,
-    isLoading,
+    isLoading: wsLoading,
     isSending,
-    error,
+    error: wsError,
     sendMessage,
     clearError,
     reconnect
   } = useThreadMessages({
     sessionId,
-    loadHistory,
+    loadHistory: false, // Don't auto-load history via WebSocket
     ...(apiBaseUrl && { apiBaseUrl })
   });
 
+  // Get thread history
+  const {
+    messages: historyMessages,
+    isLoading: historyLoading,
+    hasMore,
+    totalCount,
+    error: historyError,
+    loadMoreMessages,
+    addMessage
+  } = useThreadHistory({
+    sessionId,
+    autoLoad: loadHistory,
+    ...(apiBaseUrl && { apiBaseUrl })
+  });
+
+  // Combine history and real-time messages
+  const allMessages = React.useMemo(() => {
+    const combined = [...historyMessages, ...wsMessages];
+    // Remove duplicates by ID and sort by timestamp
+    const uniqueMessages = combined.reduce((acc, message) => {
+      if (!acc.find(m => m.id === message.id)) {
+        acc.push(message);
+      }
+      return acc;
+    }, [] as typeof combined);
+    
+    return uniqueMessages.sort((a, b) => new Date(a.ts).getTime() - new Date(b.ts).getTime());
+  }, [historyMessages, wsMessages]);
+
+  // Overall loading and error state
+  const isLoading = wsLoading || historyLoading;
+  const error = wsError || historyError;
+
   const { scrollRef } = useAutoScroll({
-    dependencies: [messages.length],
+    dependencies: [allMessages.length],
     enabled: true,
     behavior: 'smooth',
     delay: 50 // Small delay to ensure DOM is updated
   });
 
-  const hasMessages = messages.length > 0;
+  const hasMessages = allMessages.length > 0;
 
   // Handle connection state changes
   React.useEffect(() => {
@@ -177,6 +212,16 @@ export const ThreadView: React.FC<ThreadViewProps> = ({
       onConnectionChange(connectionState);
     }
   }, [connectionState, onConnectionChange]);
+
+  // Sync new WebSocket messages to history
+  React.useEffect(() => {
+    if (wsMessages.length > 0) {
+      // Add new messages from WebSocket to history
+      wsMessages.forEach(message => {
+        addMessage(message);
+      });
+    }
+  }, [wsMessages, addMessage]);
 
   // Handle errors
   React.useEffect(() => {
@@ -213,12 +258,23 @@ export const ThreadView: React.FC<ThreadViewProps> = ({
             <EmptyState />
           ) : (
             <div className="flex-1 p-4 space-y-4">
-              {messages.map((message) => (
+              {allMessages.map((message) => (
                 <MessageBubble
                   key={message.id}
                   message={message}
                 />
               ))}
+              {/* Load More Button */}
+              {hasMore && !historyLoading && (
+                <div className="flex justify-center py-4">
+                  <button
+                    onClick={loadMoreMessages}
+                    className="px-4 py-2 text-sm text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors"
+                  >
+                    Load older messages ({totalCount - allMessages.length} remaining)
+                  </button>
+                </div>
+              )}
               {/* Scroll anchor */}
               <div ref={scrollRef} className="h-1" />
             </div>

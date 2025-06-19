@@ -149,7 +149,7 @@
   - **Step Dependencies**: Steps 6, 9
   - **User Instructions**: This integrates tabs into the existing page. Test tab switching between Terminal and Thread views.
 
-- [ ] Step 14: Add Thread History Loading
+- [x] Step 14: Add Thread History Loading
   - **Task**: Implement history loading functionality that fetches and displays existing thread messages when Thread tab is first accessed
   - **Description**: This enables users to see the full conversation history when they open the Thread tab. It loads existing messages from the backend and handles pagination for large conversations.
   - **Files**:
